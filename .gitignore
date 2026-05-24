@@ -1,0 +1,39 @@
+# Virtual Environment
+venv/
+.venv/
+ENV/
+env/
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Datasets and Large Media
+data/
+archive (5) - Copy/
+
+# Phase 1/2 Model Checkpoints & Large Extracted Features
+features/
+models/
+*.npy
+*.pkl
+*.h5
+*.pt
+*.pth
+
+# Generated Outputs
+visualizations/
+
+# Local Project / Context Documents
+ANTIGRAVITY_BMAD_Context.docx
+extracted.txt
+phase1_report.txt
+
+# IDEs & System Files
+scratch/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

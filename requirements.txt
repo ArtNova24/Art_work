@@ -1,0 +1,17 @@
+torch
+torchvision
+torchaudio
+timm
+scikit-image
+scikit-learn
+numpy
+pandas
+matplotlib
+seaborn
+datasets
+Pillow
+joblib
+tqdm
+scipy
+opencv-python
+huggingface_hub
