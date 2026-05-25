@@ -37,3 +37,9 @@ scratch/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Archives
+*.zip
+*.tar.gz
+*.tgz
+*.rar

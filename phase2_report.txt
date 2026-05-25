@@ -1,0 +1,45 @@
+ANTIGRAVITY Phase 2 — Classifier & Explainability Report
+============================================================
+Hybrid vector input dimensions: 989
+
+1. Classifier Performance Comparison (Test Partition):
+------------------------------------------------------------
+  Model        | Accuracy   | Macro F1   | Weighted F1
+  ------------ | ---------- | ---------- | -----------
+  SVM          |     0.7452 |     0.7162 |      0.7459
+  RF           |     0.8005 |     0.7812 |      0.7993
+  XGB          |     0.8692 |     0.8477 |      0.8694
+  MLP          |     0.9109 |     0.9122 |      0.9109
+  CNN          |     0.7971 |     0.7879 |      0.7971
+
+2. Feature Ablation Study Results (Macro F1-Score):
+------------------------------------------------------------
+  Experiment Slice          | Dims  | Val F1   | Test F1 
+  ------------------------- | ----- | -------- | --------
+  A: Texture Only           |   276 |   0.0928 |   0.0875
+  B: Color Only             |   201 |   0.2607 |   0.2428
+  C: CNN Only               |   512 |   0.8839 |   0.8898
+  D: Texture + Color        |   477 |   0.2711 |   0.2911
+  E: Color + CNN            |   713 |   0.8005 |   0.8342
+  F: Texture + CNN          |   788 |   0.8050 |   0.7899
+  G: Full Hybrid            |   989 |   0.7100 |   0.7162
+
+Generated Deliverables:
+  ✓ svm_classifier.pkl
+  ✓ rf_classifier.pkl
+  ✓ xgb_classifier.pkl
+  ✓ mlp_classifier.pt
+  ✓ cnn_end2end_classifier.pt
+  ✓ style_predictor.pkl
+  ✓ classifier_metrics.json
+  ✓ ablation_results.csv
+
+Explainability Deliverables:
+  ✓ visualizations/ablation_study.png
+  ✓ visualizations/tsne_clustering.png
+  ✓ visualizations/shap/global_importance.png
+  ✓ visualizations/shap/impressionism_beeswarm.png
+  ✓ visualizations/shap/baroque_beeswarm.png
+
+============================================================
+PHASE 2 STATUS: SUCCESS ✓

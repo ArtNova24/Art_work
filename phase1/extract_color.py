@@ -72,7 +72,14 @@ def extract_color(img_rgb: np.ndarray,
     # Mean, std, skewness for H, S, V channels
     for ch_idx in range(3):
         ch = img_hsv[:, :, ch_idx].astype(np.float32).ravel()
-        features.append(np.array([ch.mean(), ch.std(), float(skew(ch))], dtype=np.float32))
+        ch_std = float(ch.std())
+        if ch_std < 1e-6:
+            ch_skew = 0.0
+        else:
+            ch_skew = float(skew(ch))
+            if np.isnan(ch_skew) or np.isinf(ch_skew):
+                ch_skew = 0.0
+        features.append(np.array([ch.mean(), ch_std, ch_skew], dtype=np.float32))
     # 3 × 3 = 9 ✓
 
     vec = np.concatenate(features).astype(np.float32)
