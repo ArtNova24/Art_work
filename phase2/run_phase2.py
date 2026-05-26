@@ -88,7 +88,7 @@ def compile_final_report():
     for fname in files_to_check:
         p = os.path.join(FEATURES_DIR, fname)
         ok = os.path.exists(p)
-        lines.append(f"  {'✓' if ok else '✗'} {fname}")
+        lines.append(f"  {'[OK]' if ok else '[MISSING]'} {fname}")
 
     lines.append("")
     lines.append("Explainability Deliverables:")
@@ -101,11 +101,11 @@ def compile_final_report():
     for plot in plots:
         p = os.path.join(vis_dir, plot)
         ok = os.path.exists(p)
-        lines.append(f"  {'✓' if ok else '✗'} visualizations/{plot}")
+        lines.append(f"  {'[OK]' if ok else '[MISSING]'} visualizations/{plot}")
 
     lines.append("")
     lines.append("=" * 60)
-    lines.append("PHASE 2 STATUS: SUCCESS ✓")
+    lines.append("PHASE 2 STATUS: SUCCESS")
 
     report_text = "\n".join(lines)
     print(report_text)
@@ -113,7 +113,7 @@ def compile_final_report():
     report_path = os.path.join(Path(FEATURES_DIR).parent, "phase2_report.txt")
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(report_text)
-    print(f"\n  ✓ Report saved → {report_path}")
+    print(f"\n  [OK] Report saved -> {report_path}")
 
 
 if __name__ == "__main__":
@@ -141,4 +141,4 @@ if __name__ == "__main__":
 
     elapsed = time.time() - t_start
     print(f"\n  Total Phase 2 execution time: {elapsed/60:.1f} minutes")
-    print("  ✓ Phase 2 COMPLETE — Ready for Phase 3! 🚀\n")
+    print("  [SUCCESS] Phase 2 COMPLETE — Ready for Phase 3!\n")

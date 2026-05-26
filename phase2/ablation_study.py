@@ -125,7 +125,7 @@ def run_ablation():
     df = pd.DataFrame(results)
     csv_path = os.path.join(FEATURES_DIR, "ablation_results.csv")
     df.to_csv(csv_path, index=False)
-    print(f"\n  ✓ Saved ablation results → {csv_path}")
+    print(f"\n  [OK] Saved ablation results -> {csv_path}")
 
     # Generate visual bar chart
     fig, ax = plt.subplots(figsize=(10, 5), facecolor='#0f0f1a')
@@ -173,7 +173,7 @@ def run_ablation():
     plt.tight_layout()
     plt.savefig(vis_out, dpi=120, bbox_inches='tight', facecolor=fig.get_facecolor())
     plt.close()
-    print(f"  ✓ Saved ablation bar chart → {vis_out}")
+    print(f"  [OK] Saved ablation bar chart -> {vis_out}")
 
 
 if __name__ == "__main__":

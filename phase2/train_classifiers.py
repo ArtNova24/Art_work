@@ -335,6 +335,30 @@ def train_cnn_end2end(y_train, y_val, y_test, class_weights):
     model.fc = nn.Linear(model.fc.in_features, len(ALL_CLASSES))
     model = model.to(device)
 
+    checkpoint_path = os.path.join(FEATURES_DIR, "cnn_end2end_classifier.pt")
+    if os.path.exists(checkpoint_path):
+        print(f"    Found existing CNN checkpoint {checkpoint_path}. Loading weights for evaluation...")
+        try:
+            state_dict = torch.load(checkpoint_path, map_location=device)
+            model.load_state_dict(state_dict)
+            model.eval()
+            val_preds = []
+            test_preds = []
+            with torch.no_grad():
+                for imgs, _ in val_loader:
+                    imgs = imgs.to(device)
+                    val_preds.extend(torch.argmax(model(imgs), dim=1).cpu().numpy())
+                for imgs, _ in test_loader:
+                    imgs = imgs.to(device)
+                    test_preds.extend(torch.argmax(model(imgs), dim=1).cpu().numpy())
+
+            val_res = evaluate_model("CNN-E2E Val", y_val, val_preds)
+            test_res = evaluate_model("CNN-E2E Test", y_test, test_preds)
+            print(f"    CNN End-to-End loaded and evaluated in {time.time()-t0:.1f}s")
+            return model, val_res, test_res
+        except Exception as e:
+            print(f"    Error loading CNN checkpoint: {e}. Falling back to training...")
+
     criterion = nn.CrossEntropyLoss(weight=torch.tensor(class_weights).to(device))
     optimizer = optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-4)
 
@@ -399,15 +423,7 @@ def main():
     print("  ANTIGRAVITY Phase 2 — Step 1: Model Training Engine")
     print("="*60)
 
-    # Check if models are already trained
-    required_files = [
-        "svm_classifier.pkl", "rf_classifier.pkl", "xgb_classifier.pkl",
-        "mlp_classifier.pt", "cnn_end2end_classifier.pt", "style_predictor.pkl",
-        "classifier_metrics.json"
-    ]
-    if all(os.path.exists(os.path.join(FEATURES_DIR, f)) for f in required_files):
-        print("  Cached: All models and metrics already exist on disk. Skipping training. ✓")
-        return
+    print("="*60)
 
     # 1. Load data
     X_train, X_val, X_test, y_train, y_val, y_test, class_weights = load_data()
@@ -431,7 +447,7 @@ def main():
     out_metrics_path = os.path.join(FEATURES_DIR, "classifier_metrics.json")
     with open(out_metrics_path, "w") as f:
         json.dump(metrics, f, indent=4)
-    print(f"\n  ✓ Save metrics → {out_metrics_path}")
+    print(f"\n  [OK] Save metrics -> {out_metrics_path}")
 
     # Determine best classifier (based on Test Macro F1)
     best_model_name = None
@@ -442,7 +458,7 @@ def main():
             best_f1 = f1
             best_model_name = name
 
-    print(f"\n  🥇 Best performing model: {best_model_name.upper()} (Test Macro F1: {best_f1:.4f})")
+    print(f"\n  [BEST] Best performing model: {best_model_name.upper()} (Test Macro F1: {best_f1:.4f})")
 
     # Serialize best classical model as style_predictor.pkl
     # XGBoost or RF or SVM (MLP/CNN are PyTorch checkpoints, so we serialize the best sklearn/xgb model)
@@ -454,7 +470,7 @@ def main():
 
     predictor_path = os.path.join(FEATURES_DIR, "style_predictor.pkl")
     joblib.dump(best_classical, predictor_path)
-    print(f"  ✓ Serialized best classical model style oracle → {predictor_path}")
+    print(f"  [OK] Serialized best classical model style oracle -> {predictor_path}")
 
 
 if __name__ == "__main__":

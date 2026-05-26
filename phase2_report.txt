@@ -6,40 +6,40 @@ Hybrid vector input dimensions: 989
 ------------------------------------------------------------
   Model        | Accuracy   | Macro F1   | Weighted F1
   ------------ | ---------- | ---------- | -----------
-  SVM          |     0.7452 |     0.7162 |      0.7459
-  RF           |     0.8005 |     0.7812 |      0.7993
-  XGB          |     0.8692 |     0.8477 |      0.8694
-  MLP          |     0.9109 |     0.9122 |      0.9109
-  CNN          |     0.7971 |     0.7879 |      0.7971
+  SVM          |     0.8963 |     0.8960 |      0.8966
+  RF           |     0.7948 |     0.7664 |      0.7929
+  XGB          |     0.8703 |     0.8516 |      0.8705
+  MLP          |     0.9154 |     0.9170 |      0.9155
+  CNN          |     0.8072 |     0.8086 |      0.8071
 
 2. Feature Ablation Study Results (Macro F1-Score):
 ------------------------------------------------------------
   Experiment Slice          | Dims  | Val F1   | Test F1 
   ------------------------- | ----- | -------- | --------
-  A: Texture Only           |   276 |   0.0928 |   0.0875
-  B: Color Only             |   201 |   0.2607 |   0.2428
-  C: CNN Only               |   512 |   0.8839 |   0.8898
-  D: Texture + Color        |   477 |   0.2711 |   0.2911
-  E: Color + CNN            |   713 |   0.8005 |   0.8342
-  F: Texture + CNN          |   788 |   0.8050 |   0.7899
-  G: Full Hybrid            |   989 |   0.7100 |   0.7162
+  A: Texture Only           |   276 |   0.5056 |   0.5218
+  B: Color Only             |   201 |   0.3619 |   0.3728
+  C: CNN Only               |   512 |   0.8834 |   0.8940
+  D: Texture + Color        |   477 |   0.5818 |   0.6178
+  E: Color + CNN            |   713 |   0.8817 |   0.8933
+  F: Texture + CNN          |   788 |   0.8814 |   0.8959
+  G: Full Hybrid            |   989 |   0.8790 |   0.8960
 
 Generated Deliverables:
-  ✓ svm_classifier.pkl
-  ✓ rf_classifier.pkl
-  ✓ xgb_classifier.pkl
-  ✓ mlp_classifier.pt
-  ✓ cnn_end2end_classifier.pt
-  ✓ style_predictor.pkl
-  ✓ classifier_metrics.json
-  ✓ ablation_results.csv
+  [OK] svm_classifier.pkl
+  [OK] rf_classifier.pkl
+  [OK] xgb_classifier.pkl
+  [OK] mlp_classifier.pt
+  [OK] cnn_end2end_classifier.pt
+  [OK] style_predictor.pkl
+  [OK] classifier_metrics.json
+  [OK] ablation_results.csv
 
 Explainability Deliverables:
-  ✓ visualizations/ablation_study.png
-  ✓ visualizations/tsne_clustering.png
-  ✓ visualizations/shap/global_importance.png
-  ✓ visualizations/shap/impressionism_beeswarm.png
-  ✓ visualizations/shap/baroque_beeswarm.png
+  [OK] visualizations/ablation_study.png
+  [OK] visualizations/tsne_clustering.png
+  [OK] visualizations/shap/global_importance.png
+  [OK] visualizations/shap/impressionism_beeswarm.png
+  [OK] visualizations/shap/baroque_beeswarm.png
 
 ============================================================
-PHASE 2 STATUS: SUCCESS ✓
+PHASE 2 STATUS: SUCCESS

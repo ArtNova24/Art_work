@@ -156,7 +156,7 @@ def run_shap_analysis():
     plt.tight_layout()
     plt.savefig(global_out, dpi=120, bbox_inches='tight', facecolor=fig.get_facecolor())
     plt.close()
-    print(f"  ✓ Saved global SHAP plot → {global_out}")
+    print(f"  [OK] Saved global SHAP plot -> {global_out}")
 
     # 5. Generate Per-Style Beeswarm Plots for a few illustrative classes
     # We will generate summary plots for two interesting styles: "Baroque" (index 2) and "Impressionism" (index 0)
@@ -190,7 +190,7 @@ def run_shap_analysis():
             plt.tight_layout()
             plt.savefig(out_path, dpi=120, bbox_inches='tight', facecolor=fig.get_facecolor())
             plt.close()
-            print(f"    → Saved {style_name} SHAP beeswarm → {out_path}")
+            print(f"    -> Saved {style_name} SHAP beeswarm -> {out_path}")
 
 
 if __name__ == "__main__":

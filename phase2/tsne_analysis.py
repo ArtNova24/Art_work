@@ -73,7 +73,7 @@ def run_tsne_analysis():
 
     X_2d = tsne.fit_transform(X_test)
     elapsed = (pd.Timestamp.now() - t0).total_seconds()
-    print(f"  ✓ t-SNE fit completed in {elapsed:.1f}s")
+    print(f"  [OK] t-SNE fit completed in {elapsed:.1f}s")
 
     # 2. Build plotting DataFrame
     df = pd.DataFrame(X_2d, columns=["t-SNE Dimension 1", "t-SNE Dimension 2"])
@@ -131,7 +131,7 @@ def run_tsne_analysis():
     plt.tight_layout()
     plt.savefig(vis_out, dpi=150, bbox_inches='tight', facecolor=fig.get_facecolor())
     plt.close()
-    print(f"  ✓ Saved t-SNE scatter plot → {vis_out}")
+    print(f"  [OK] Saved t-SNE scatter plot -> {vis_out}")
 
 
 if __name__ == "__main__":
