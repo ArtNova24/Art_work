@@ -460,13 +460,24 @@ def main():
 
     print(f"\n  [BEST] Best performing model: {best_model_name.upper()} (Test Macro F1: {best_f1:.4f})")
 
-    # Serialize best classical model as style_predictor.pkl
-    # XGBoost or RF or SVM (MLP/CNN are PyTorch checkpoints, so we serialize the best sklearn/xgb model)
-    best_classical = xgb_m
-    if best_model_name == "svm":
+    # Serialize best classical model (SVM, RF, or XGBoost) as style_predictor.pkl
+    classical_names = ["svm", "rf", "xgb"]
+    best_classical_name = "xgb"
+    best_classical_f1 = 0.0
+    for name in classical_names:
+        f1 = metrics[name]["test"]["f1_macro"]
+        if f1 > best_classical_f1:
+            best_classical_f1 = f1
+            best_classical_name = name
+
+    print(f"  [BEST CLASSICAL] Best classical model: {best_classical_name.upper()} (Test Macro F1: {best_classical_f1:.4f})")
+
+    if best_classical_name == "svm":
         best_classical = svm
-    elif best_model_name == "rf":
+    elif best_classical_name == "rf":
         best_classical = rf
+    else:
+        best_classical = xgb_m
 
     predictor_path = os.path.join(FEATURES_DIR, "style_predictor.pkl")
     joblib.dump(best_classical, predictor_path)
