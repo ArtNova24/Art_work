@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 3 — Style-Conditioned I-JEPA Reconstruction Orchestrator.
+Historic Image Restoration Phase 3 — Style-Conditioned I-JEPA Reconstruction Orchestrator.
 Parses options, enforces deterministic random seeding, and triggers training.
 All prints and comments are kept strictly in ASCII.
 """
@@ -19,7 +19,7 @@ from phase3.config import RANDOM_SEED
 from phase3.train_jepa import run_training
 
 def main():
-    parser = argparse.ArgumentParser(description="ANTIGRAVITY Phase 3 — Style-Conditioned I-JEPA Reconstruction Suite")
+    parser = argparse.ArgumentParser(description="Historic Image Restoration Phase 3 — Style-Conditioned I-JEPA Reconstruction Suite")
     parser.add_argument("--dry-run", action="store_true", help="Execute 2 training epochs over a mini-dataset for fast shape & gradient flow verification.")
     parser.add_argument("--epochs", type=int, default=None, help="Override default epoch count.")
     args = parser.parse_args()
@@ -30,7 +30,7 @@ def main():
     os.environ['PYTHONIOENCODING'] = 'utf-8'
 
     print("============================================================")
-    print("  ANTIGRAVITY Phase 3 — Style-Conditioned I-JEPA Model")
+    print("  Historic Image Restoration Phase 3 — Style-Conditioned I-JEPA Model")
     print("============================================================")
 
     # 1. Enforce determinism and set random seeds

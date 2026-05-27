@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 4 -- Master Orchestrator
+Historic Image Restoration Phase 4 -- Master Orchestrator
 Supports two modes via CLI:
   --evaluate   Runs the full quantitative test-set evaluation suite.
   --demo       Launches the interactive Gradio web application.
@@ -35,7 +35,7 @@ def run_evaluate(dry_run=False):
     from phase4.evaluator import Phase4Evaluator
 
     print("============================================================")
-    print("  ANTIGRAVITY Phase 4 -- Evaluation & Metrics Suite")
+    print("  Historic Image Restoration Phase 4 -- Evaluation & Metrics Suite")
     print("============================================================")
 
     set_seeds()
@@ -58,7 +58,7 @@ def run_evaluate(dry_run=False):
 
 def run_demo():
     print("============================================================")
-    print("  ANTIGRAVITY Phase 4 -- Interactive Gradio Demo")
+    print("  Historic Image Restoration Phase 4 -- Interactive Gradio Demo")
     print("============================================================")
     print("  Launching on http://127.0.0.1:7860 ...")
     print("  Press Ctrl+C to stop the server.")
@@ -87,7 +87,7 @@ def main():
     os.environ['PYTHONIOENCODING'] = 'utf-8'
 
     parser = argparse.ArgumentParser(
-        description="ANTIGRAVITY Phase 4 -- Evaluation and Demo Orchestrator"
+        description="Historic Image Restoration Phase 4 -- Evaluation and Demo Orchestrator"
     )
     parser.add_argument(
         "--evaluate",

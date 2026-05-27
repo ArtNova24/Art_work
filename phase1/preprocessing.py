@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 1 — Step 2: Preprocessing Utilities
+Historic Image Restoration Phase 1 — Step 2: Preprocessing Utilities
 Shared image loading and conversion functions used by all feature extractors.
 """
 

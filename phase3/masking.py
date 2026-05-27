@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 3 — Block-Wise Masking Pipeline.
+Historic Image Restoration Phase 3 — Block-Wise Masking Pipeline.
 Generates contiguous block masks over the 14x14 patch grid,
 simulating realistic physical damage to paintings while maintaining
 a fixed 50% mask ratio (exactly 98 context and 98 target patches)

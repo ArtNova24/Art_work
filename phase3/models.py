@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 3 — Neural Network Models.
+Historic Image Restoration Phase 3 — Neural Network Models.
 Implements:
   1. StyleProjector: Projects 989-dim hybrid style vector to 256-dim.
   2. Attention & TransformerBlock: Pure PyTorch implementation of Vit blocks.

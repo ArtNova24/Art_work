@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 1 — Step 6: CNN Feature Extraction
+Historic Image Restoration Phase 1 — Step 6: CNN Feature Extraction
 Extracts 512-dimensional deep CNN features using DINOv2 + ResNet-50.
 
 Output:
@@ -246,7 +246,7 @@ def apply_pca(raw_features: np.ndarray, fit: bool = True):
 
 if __name__ == "__main__":
     print("\n" + "="*60)
-    print("  ANTIGRAVITY Phase 1 — Step 6: CNN Extraction")
+    print("  Historic Image Restoration Phase 1 — Step 6: CNN Extraction")
     print("="*60)
 
     index_path = os.path.join(FEATURES_DIR, "image_index.json")

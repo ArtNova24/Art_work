@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 2 — Step 2: Feature Ablation Study
+Historic Image Restoration Phase 2 — Step 2: Feature Ablation Study
 Evaluates classifier performance on 7 different feature slices:
   - Experiment A: Texture only (GLCM + LBP)         → 276 dims
   - Experiment B: Color only (Histograms + moments) → 201 dims
@@ -75,7 +75,7 @@ def get_slices():
 
 def run_ablation():
     print("\n" + "="*60)
-    print("  ANTIGRAVITY Phase 2 — Step 2: Feature Ablation Study")
+    print("  Historic Image Restoration Phase 2 — Step 2: Feature Ablation Study")
     print("="*60)
 
     # 1. Load data
@@ -141,7 +141,7 @@ def run_ablation():
     rects1 = ax.bar(x - width/2, val_f1, width, label='Val F1 (Macro)', color='#7c6af7', alpha=0.85)
     rects2 = ax.bar(x + width/2, test_f1, width, label='Test F1 (Macro)', color='#00d2c4', alpha=0.85)
 
-    ax.set_title('Feature Ablation Study — ANTIGRAVITY Style Classification', color='white', fontsize=12, pad=15)
+    ax.set_title('Feature Ablation Study — Historic Image Restoration Style Classification', color='white', fontsize=12, pad=15)
     ax.set_xticks(x)
     ax.set_xticklabels(x_labels, rotation=15, color='#aaaaaa', fontsize=9)
     ax.tick_params(colors='#888888')

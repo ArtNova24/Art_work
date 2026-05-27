@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 1 — Central Configuration
+Historic Image Restoration Phase 1 — Central Configuration
 All paths, constants, and hyperparameters in one place.
 """
 import os

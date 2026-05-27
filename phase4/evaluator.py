@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 4 — Core Evaluation and Metrics Engine
+Historic Image Restoration Phase 4 — Core Evaluation and Metrics Engine
 Computes:
   1. SSIM and PSNR on the test set.
   2. InceptionV3-based FID (Fréchet Inception Distance).
@@ -506,7 +506,7 @@ class Phase4Evaluator:
     def generate_report(self, res, count):
         """Generates a detailed, beautiful ASCII evaluation report."""
         lines = []
-        lines.append("ANTIGRAVITY Phase 4 — Model Evaluation & Integration Report")
+        lines.append("Historic Image Restoration Phase 4 — Model Evaluation & Integration Report")
         lines.append("============================================================")
         lines.append(f"Date: 2026-05-26")
         lines.append(f"Test Partition Size: {count} images")

@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 1 — Step 4: LBP Feature Extraction
+Historic Image Restoration Phase 1 — Step 4: LBP Feature Extraction
 Extracts 256-dimensional Local Binary Pattern histogram features.
 
 Output: features/lbp_features.npy  shape (N, 256)
@@ -79,7 +79,7 @@ def extract_lbp_all(image_index: list) -> np.ndarray:
 
 if __name__ == "__main__":
     print("\n" + "="*60)
-    print("  ANTIGRAVITY Phase 1 — Step 4: LBP Extraction")
+    print("  Historic Image Restoration Phase 1 — Step 4: LBP Extraction")
     print("="*60)
 
     index_path = os.path.join(FEATURES_DIR, "image_index.json")

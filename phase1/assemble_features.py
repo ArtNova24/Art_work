@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 1 — Step 7: Feature Assembly & Splitting
+Historic Image Restoration Phase 1 — Step 7: Feature Assembly & Splitting
 Concatenates all feature vectors into the 989-dim hybrid matrix.
 Performs stratified 70/15/15 split and saves all output files.
 Computes class weights for imbalance handling.
@@ -154,7 +154,7 @@ def save_all_outputs(X_train, X_val, X_test, y_train, y_val, y_test, class_weigh
 
 if __name__ == "__main__":
     print("\n" + "="*60)
-    print("  ANTIGRAVITY Phase 1 — Step 7: Feature Assembly")
+    print("  Historic Image Restoration Phase 1 — Step 7: Feature Assembly")
     print("="*60)
 
     # Load

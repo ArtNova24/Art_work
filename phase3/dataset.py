@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 3 — Style JEPA Dataset.
+Historic Image Restoration Phase 3 — Style JEPA Dataset.
 Loads preprocessed raw image tensors alongside pre-saved,
 optimized hybrid 989-dimensional style vectors.
 Uses deterministic split matching to guarantee alignment.

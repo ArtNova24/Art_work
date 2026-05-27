@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 1 — Step 5: Color Feature Extraction
+Historic Image Restoration Phase 1 — Step 5: Color Feature Extraction
 Extracts 201-dimensional colour feature vector.
 
 Output: features/color_features.npy  shape (N, 201)
@@ -118,7 +118,7 @@ def extract_color_all(image_index: list) -> np.ndarray:
 
 if __name__ == "__main__":
     print("\n" + "="*60)
-    print("  ANTIGRAVITY Phase 1 — Step 5: Color Extraction")
+    print("  Historic Image Restoration Phase 1 — Step 5: Color Extraction")
     print("="*60)
 
     index_path = os.path.join(FEATURES_DIR, "image_index.json")

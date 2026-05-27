@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 2 — Step 4: Representation t-SNE Analysis
+Historic Image Restoration Phase 2 — Step 4: Representation t-SNE Analysis
 Applies t-SNE dimensionality reduction to the hybrid feature matrix
 to project the multi-modal art representations down to 2D.
 
@@ -48,7 +48,7 @@ DISPLAY_NAMES = {
 
 def run_tsne_analysis():
     print("\n" + "="*60)
-    print("  ANTIGRAVITY Phase 2 — Step 4: Representation t-SNE Analysis")
+    print("  Historic Image Restoration Phase 2 — Step 4: Representation t-SNE Analysis")
     print("="*60)
 
     # 1. Load data
@@ -103,7 +103,7 @@ def run_tsne_analysis():
         ax=ax
     )
 
-    ax.set_title('ANTIGRAVITY Style Embedding Projection (t-SNE)', color='white', fontsize=14, pad=15)
+    ax.set_title('Historic Image Restoration Style Embedding Projection (t-SNE)', color='white', fontsize=14, pad=15)
     ax.set_xlabel('t-SNE Dimension 1', color='#aaaaaa', fontsize=10)
     ax.set_ylabel('t-SNE Dimension 2', color='#aaaaaa', fontsize=10)
     ax.tick_params(colors='#888888')

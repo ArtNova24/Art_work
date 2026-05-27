@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 3 — central configuration for Style-Conditioned I-JEPA.
+Historic Image Restoration Phase 3 — central configuration for Style-Conditioned I-JEPA.
 Defines hyperparameters, hardware settings, and file paths.
 All prints and comments are kept strictly in ASCII.
 """

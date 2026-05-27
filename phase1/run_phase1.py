@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 1 — Master Orchestration Script
+Historic Image Restoration Phase 1 — Master Orchestration Script
 Runs all Phase 1 steps in order:
   1. Dataset preparation (expects data already downloaded)
   2. GLCM extraction        → features/glcm_features.npy   (N, 20)
@@ -163,7 +163,7 @@ def final_report(image_index, glcm, lbp, color, cnn):
     header("Phase 1 — Final Report", char="*")
 
     lines = []
-    lines.append("ANTIGRAVITY Phase 1 — Feature Extraction Report")
+    lines.append("Historic Image Restoration Phase 1 — Feature Extraction Report")
     lines.append("=" * 60)
     lines.append(f"Total images: {len(image_index)}")
     lines.append(f"Feature dims: GLCM={GLCM_DIM}, LBP={LBP_DIM}, Color={COLOR_DIM}, CNN={CNN_DIM}")
@@ -214,7 +214,7 @@ def final_report(image_index, glcm, lbp, color, cnn):
 if __name__ == "__main__":
     t_start = time.time()
     print("\n" + "*"*60)
-    print("  ANTIGRAVITY Phase 1 — Full Pipeline")
+    print("  Historic Image Restoration Phase 1 — Full Pipeline")
     print("*"*60)
 
     os.makedirs(FEATURES_DIR, exist_ok=True)

@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 1 — Step 3: GLCM Feature Extraction
+Historic Image Restoration Phase 1 — Step 3: GLCM Feature Extraction
 Extracts 20-dimensional Grey-Level Co-occurrence Matrix features.
 
 Output: features/glcm_features.npy  shape (N, 20)
@@ -88,7 +88,7 @@ def extract_glcm_all(image_index: list) -> np.ndarray:
 
 if __name__ == "__main__":
     print("\n" + "="*60)
-    print("  ANTIGRAVITY Phase 1 — Step 3: GLCM Extraction")
+    print("  Historic Image Restoration Phase 1 — Step 3: GLCM Extraction")
     print("="*60)
 
     index_path = os.path.join(FEATURES_DIR, "image_index.json")

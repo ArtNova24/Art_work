@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 4 -- Interactive Gradio Web Application
+Historic Image Restoration Phase 4 -- Interactive Gradio Web Application
 End-to-end demo: Upload damaged painting -> Style detected -> Style-Conditioned I-JEPA reconstructs.
 Features:
   - Premium dark-mode glassmorphic theme.
@@ -50,7 +50,7 @@ import gradio as gr
 # ---------------------------------------------------------------------------
 # Model Registry -- loaded once at startup
 # ---------------------------------------------------------------------------
-print("  [ANTIGRAVITY] Initializing model registry for Gradio demo...")
+print("  [Historic Image Restoration] Initializing model registry for Gradio demo...")
 
 _projector = StyleProjector().to(DEVICE)
 _projector.load_state_dict(torch.load(os.path.join(FEATURES_DIR, "jepa_style_projector.pt"), map_location=DEVICE))
@@ -78,7 +78,7 @@ _mask_gen   = BlockMaskGenerator(grid_size=14, target_masked=98)
 from extract_cnn import load_models as _load_cnn_models
 _dino, _resnet = _load_cnn_models()
 
-print("  [ANTIGRAVITY] Model registry loaded successfully.")
+print("  [Historic Image Restoration] Model registry loaded successfully.")
 
 # ---------------------------------------------------------------------------
 # Pre-Processing Utilities
@@ -690,13 +690,13 @@ def build_app():
         font=[gr.themes.GoogleFont("Inter"), "system-ui", "sans-serif"],
     )
     with gr.Blocks(
-        title="ANTIGRAVITY -- Art Reconstruction System",
+        title="Historic Image Restoration -- Art Reconstruction System",
     ) as demo:
 
         gr.HTML("""
         <div style="text-align:center; padding: 32px 0 16px;">
             <h1 style="font-size:2.6rem; margin-bottom: 8px;">
-                ✦ ANTIGRAVITY
+                ✦ Historic Image Restoration
             </h1>
             <p style="color:#8888aa; font-size:1.05rem; max-width:680px; margin:0 auto;">
                 Style-Conditioned Art Reconstruction via I-JEPA &amp; Hybrid Feature Analysis.
@@ -827,7 +827,7 @@ def build_app():
 
         gr.HTML("""
         <div style="text-align:center; padding:24px; color:#44445a; font-size:0.8rem;">
-            ANTIGRAVITY &mdash; AI Art Restoration Research &nbsp;|&nbsp;
+            Historic Image Restoration &mdash; AI Art Restoration Research &nbsp;|&nbsp;
             WikiArt-10 + Indian Cultural Heritage Art &nbsp;|&nbsp;
             I-JEPA + Hybrid Feature Analysis
         </div>

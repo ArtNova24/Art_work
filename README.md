@@ -1,7 +1,7 @@
-# ANTIGRAVITY — Art Reconstruction System
+# Historic Image Restoration — Art Reconstruction System
 ## Phase 1: Data Pipeline & Hybrid Feature Extraction
 
-Welcome to the **ANTIGRAVITY** codebase. This repository contains the first stage of a two-stage AI research system designed to analyze and reconstruct damaged paintings using a combination of handcrafted visual descriptors, deep representation learning, and style-conditioned self-supervised models.
+Welcome to the **Historic Image Restoration** codebase. This repository contains the first stage of a two-stage AI research system designed to analyze and reconstruct damaged paintings using a combination of handcrafted visual descriptors, deep representation learning, and style-conditioned self-supervised models.
 
 This document details **Phase 1**, which has been fully completed and verified. Phase 1 builds the entire data pipeline, preprocesses art images, extracts a premium **989-dimensional hybrid style descriptor**, and splits the dataset for classifier development (Phase 2).
 
@@ -364,7 +364,7 @@ $env:PYTHONIOENCODING='utf-8'; .\venv\Scripts\python.exe phase2\run_phase2.py
 
 ## 🎨 Phase 3: Style-Conditioned I-JEPA Reconstruction Model
 
-In Phase 3, we implement and train the **Style-Conditioned I-JEPA (Image Joint Embedding Predictive Architecture)**. This model represents the core research contribution of the ANTIGRAVITY project: it reconstructs corrupted, damaged, or physically missing regions of paintings by conditioning self-supervised latent prediction and pixel reconstruction directly on our 989-dimensional optimized hybrid style fingerprint.
+In Phase 3, we implement and train the **Style-Conditioned I-JEPA (Image Joint Embedding Predictive Architecture)**. This model represents the core research contribution of the Historic Image Restoration project: it reconstructs corrupted, damaged, or physically missing regions of paintings by conditioning self-supervised latent prediction and pixel reconstruction directly on our 989-dimensional optimized hybrid style fingerprint.
 
 Unlike standard, style-agnostic pixel inpainting, this architecture allows style embeddings to guide the structural synthesis and texture-matching of missing regions, achieving a style-faithful restoration.
 
@@ -504,4 +504,4 @@ To retrain the Style-Conditioned I-JEPA model or run training with custom epochs
 2. **Review intermediate reconstructions**:
    Open `visualizations/reconstructions/` and inspect `epoch_15.png` to view the high-fidelity, style-guided restored paintings.
 
-The complete **ANTIGRAVITY** research codebase is now fully implemented, optimized, and verified across all phases, establishing a state-of-the-art hybrid framework for style-conditioned self-supervised art restoration. 🚀
+The complete **Historic Image Restoration** research codebase is now fully implemented, optimized, and verified across all phases, establishing a state-of-the-art hybrid framework for style-conditioned self-supervised art restoration. 🚀

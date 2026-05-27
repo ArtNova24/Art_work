@@ -1,4 +1,4 @@
-ANTIGRAVITY Phase 2 — Classifier & Explainability Report
+Historic Image Restoration Phase 2 — Classifier & Explainability Report
 ============================================================
 Hybrid vector input dimensions: 989
 

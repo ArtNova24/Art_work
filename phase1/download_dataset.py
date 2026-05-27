@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 1 — Step 1: Dataset Download & Preparation (Streaming version)
+Historic Image Restoration Phase 1 — Step 1: Dataset Download & Preparation (Streaming version)
 Downloads WikiArt-10 from HuggingFace using fast sharded streaming from Artificio/WikiArt.
 Handles Surrealism and other styles to reach 500 images per class.
 Indexes the Indian Art-8 dataset.
@@ -220,7 +220,7 @@ def build_image_index():
 
 if __name__ == "__main__":
     print("\n" + "*"*60)
-    print("  ANTIGRAVITY Phase 1 — Step 1: Dataset Preparation (Artificio Stream)")
+    print("  Historic Image Restoration Phase 1 — Step 1: Dataset Preparation (Artificio Stream)")
     print("*"*60)
 
     # Disable Xet download to avoid potential hangs/stalls

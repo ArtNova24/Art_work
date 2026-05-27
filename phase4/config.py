@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 4 — Configuration
+Historic Image Restoration Phase 4 — Configuration
 Defines paths, constants, and evaluation settings for Phase 4.
 All comments and strings are kept strictly in ASCII.
 """

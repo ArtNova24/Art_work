@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 2 — Master Orchestration Script
+Historic Image Restoration Phase 2 — Master Orchestration Script
 Runs all Phase 2 steps in order:
   1. Classifiers training   → features/classifier_metrics.json, features/style_predictor.pkl
   2. Ablation study         → features/ablation_results.csv, visualizations/ablation_study.png
@@ -52,7 +52,7 @@ def compile_final_report():
         ablation_df = pd.read_csv(ablation_path)
 
     lines = []
-    lines.append("ANTIGRAVITY Phase 2 — Classifier & Explainability Report")
+    lines.append("Historic Image Restoration Phase 2 — Classifier & Explainability Report")
     lines.append("=" * 60)
     lines.append(f"Hybrid vector input dimensions: {TOTAL_DIM}")
     lines.append("")
@@ -118,7 +118,7 @@ def compile_final_report():
 
 if __name__ == "__main__":
     t_start = time.time()
-    header("ANTIGRAVITY Phase 2 — Master Orchestration Script", char="*")
+    header("Historic Image Restoration Phase 2 — Master Orchestration Script", char="*")
 
     # Step 1: Train all 5 classifiers
     header("Step 1/4: Classifier Training Engine")

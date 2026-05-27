@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 2 — Step 3: SHAP Feature Attribution
+Historic Image Restoration Phase 2 — Step 3: SHAP Feature Attribution
 Computes SHAP values on a stratified test subset to explain which features
 (GLCM, LBP, Color, CNN) are most discriminative globally and per style class.
 
@@ -73,7 +73,7 @@ def get_feature_names():
 
 def run_shap_analysis():
     print("\n" + "="*60)
-    print("  ANTIGRAVITY Phase 2 — Step 3: SHAP Explainability Engine")
+    print("  Historic Image Restoration Phase 2 — Step 3: SHAP Explainability Engine")
     print("="*60)
 
     # 1. Load data

@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 2 — Step 1: Model Training
+Historic Image Restoration Phase 2 — Step 1: Model Training
 Trains 5 style classifiers on the 989-dim hybrid feature matrix:
   1. SVM with RBF kernel
   2. Random Forest (500 trees)
@@ -420,7 +420,7 @@ def train_cnn_end2end(y_train, y_val, y_test, class_weights):
 
 def main():
     print("\n" + "="*60)
-    print("  ANTIGRAVITY Phase 2 — Step 1: Model Training Engine")
+    print("  Historic Image Restoration Phase 2 — Step 1: Model Training Engine")
     print("="*60)
 
     print("="*60)

@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 1 — Step 8: Feature Visualisation
+Historic Image Restoration Phase 1 — Step 8: Feature Visualisation
 Generates sample visualisations for one image per style class:
   - GLCM co-occurrence matrix heatmap
   - LBP histogram
@@ -206,7 +206,7 @@ def generate_all_visualisations(image_index: list):
 
 if __name__ == "__main__":
     print("\n" + "="*60)
-    print("  ANTIGRAVITY Phase 1 — Step 8: Visualisations")
+    print("  Historic Image Restoration Phase 1 — Step 8: Visualisations")
     print("="*60)
 
     index_path = os.path.join(FEATURES_DIR, "image_index.json")

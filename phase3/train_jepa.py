@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 3 — Style-Conditioned I-JEPA Training Suite.
+Historic Image Restoration Phase 3 — Style-Conditioned I-JEPA Training Suite.
 Implements:
   1. Loss orchestrations (Latent L2 + Pixel L2 joint optimization).
   2. Momentum-based target encoder tracking (EMA).

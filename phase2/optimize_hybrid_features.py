@@ -1,5 +1,5 @@
 """
-ANTIGRAVITY Phase 2.5 — Feature Normalization & Validation-Tuned Blending
+Historic Image Restoration Phase 2.5 — Feature Normalization & Validation-Tuned Blending
 1. Slices features into Handcrafted (GLCM + LBP + Color) and CNN.
 2. Normalizes each block independently using Z-score (StandardScaler) fitted on train.
 3. Computes global SHAP feature importances using a fast Random Forest.
@@ -54,7 +54,7 @@ def load_data():
 
 def main():
     print("\n" + "="*60)
-    print("  ANTIGRAVITY Phase 2.5: Optimized Feature Blending (Beta Grid Search)")
+    print("  Historic Image Restoration Phase 2.5: Optimized Feature Blending (Beta Grid Search)")
     print("="*60)
     
     # 1. Load raw data
