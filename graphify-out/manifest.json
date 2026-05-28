@@ -1,0 +1,207 @@
+{
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase1\\assemble_features.py": {
+    "mtime": 1779886876.197121,
+    "ast_hash": "d94a49b4242ac988dd8081132826f3c7",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase1\\config.py": {
+    "mtime": 1779886876.197668,
+    "ast_hash": "47734860ece05adfc2dcefcf360be92a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase1\\download_dataset.py": {
+    "mtime": 1779886876.1986797,
+    "ast_hash": "9b160edb4da4aa205fc5bc6b57daf33b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase1\\extract_cnn.py": {
+    "mtime": 1779886876.1986797,
+    "ast_hash": "b4b8d4f5e854ce5b3866425a6fe69c5d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase1\\extract_color.py": {
+    "mtime": 1779886876.2001848,
+    "ast_hash": "e07d544c40db484d89d6af44fc42139d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase1\\extract_glcm.py": {
+    "mtime": 1779886876.2001848,
+    "ast_hash": "1780c8be4b1e6f753aaccea5b2223ad2",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase1\\extract_lbp.py": {
+    "mtime": 1779886876.2001848,
+    "ast_hash": "fd54f78f01a621b731b7fe588757c7a3",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase1\\preprocessing.py": {
+    "mtime": 1779886876.2011914,
+    "ast_hash": "a3e1746f0a508a0b33d2f78d58fe08d8",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase1\\run_phase1.py": {
+    "mtime": 1779886876.2011914,
+    "ast_hash": "82eef2f6304787b7e0a231235a848aae",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase1\\visualize.py": {
+    "mtime": 1779886876.20219,
+    "ast_hash": "3cc5c046d7a8058af9dbacd6b19e1580",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase2\\ablation_study.py": {
+    "mtime": 1779886876.20219,
+    "ast_hash": "7f28d25e0090677c6f89c2967e96831f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase2\\optimize_hybrid_features.py": {
+    "mtime": 1779886876.20219,
+    "ast_hash": "a081cf765e3a1190987c4fbe229c5ef1",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase2\\run_phase2.py": {
+    "mtime": 1779886876.20219,
+    "ast_hash": "be9a9859371e7e246a31853ffef04605",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase2\\shap_analysis.py": {
+    "mtime": 1779886876.2036939,
+    "ast_hash": "a23ca2ba5ca9c0b620b9718010d5f108",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase2\\train_classifiers.py": {
+    "mtime": 1779886876.2036939,
+    "ast_hash": "25e13d7b8a72524be0f32ffa2e37cf31",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase2\\tsne_analysis.py": {
+    "mtime": 1779886876.2046993,
+    "ast_hash": "7c8ad2dd0045053c199f37d0694cb2c1",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase3\\config.py": {
+    "mtime": 1779955857.5099988,
+    "ast_hash": "c2d67a225addee9aeaa1d87bb56c87d8",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase3\\dataset.py": {
+    "mtime": 1779955910.8255787,
+    "ast_hash": "3f61ebdc96c60f2acfb9936956eae8bd",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase3\\diffusion_decoder.py": {
+    "mtime": 1779955921.1064856,
+    "ast_hash": "65012cd3b20cf8975cb8e4c77b09dcae",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase3\\masking.py": {
+    "mtime": 1779886876.2056994,
+    "ast_hash": "1980d3b6a00a6d5eefd1d3c3ed9b62e5",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase3\\models.py": {
+    "mtime": 1779955874.3732853,
+    "ast_hash": "f03ffcfeb9e56cca948d5a6f6f7cf87f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase3\\run_phase3.py": {
+    "mtime": 1779886876.2066991,
+    "ast_hash": "3f0acd19405c4e8e4b52150d90ddbfa8",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase3\\train_jepa.py": {
+    "mtime": 1779955903.9176846,
+    "ast_hash": "8d750016f4d9f0a934e62bb7ef24f083",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase4\\config.py": {
+    "mtime": 1779886876.2077,
+    "ast_hash": "853fe8363c715c4900190ebe8e566f18",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase4\\evaluator.py": {
+    "mtime": 1779967262.8005452,
+    "ast_hash": "dd7ae5565479d5fde8ecb8e1bb7b6c65",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase4\\gradio_app.py": {
+    "mtime": 1779909424.7649045,
+    "ast_hash": "f057b81ca7b4f757013194fe352e7d94",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase4\\run_phase4.py": {
+    "mtime": 1779893477.151161,
+    "ast_hash": "9fe07b68cba836106439c752ea908f77",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase4\\__init__.py": {
+    "mtime": 1779886876.2102091,
+    "ast_hash": "838f4c84ad136f4722663c02d0a1aa53",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\ANTIGRAVITY_Improvement_Plan.md": {
+    "mtime": 1779954762.0335176,
+    "ast_hash": "e23bb1bb03f412d3af91cb8a7bca309b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\HISTORIC_IMAGE_RESTORATION_OVERVIEW.md": {
+    "mtime": 1779890517.9165483,
+    "ast_hash": "3ca6754118e6fde99fc20ea57e12cb8e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase2_report.txt": {
+    "mtime": 1779886876.0530908,
+    "ast_hash": "20d8dbcf487e96d11cd8dad6f1482e4b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\phase4_report.txt": {
+    "mtime": 1779967895.7002418,
+    "ast_hash": "bb4330a1cecc7e485836c3c3f5f0bbc6",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\README.md": {
+    "mtime": 1779886876.056096,
+    "ast_hash": "f4ca2459ccb59da4673a661b4408f25d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\requirements.txt": {
+    "mtime": 1779567302.229573,
+    "ast_hash": "3d277171504cbcf2a3a96b0e5e1ee6ab",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\diagrams\\readme.md": {
+    "mtime": 1779890090.3882778,
+    "ast_hash": "bdf4e86033e76faf92a4210d5834a93c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\diagrams\\end_to_end_flow.png": {
+    "mtime": 1779890503.8084738,
+    "ast_hash": "c5a0f48a087550cd9003072e8e820695",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\diagrams\\hld_architecture.png": {
+    "mtime": 1779887495.382362,
+    "ast_hash": "1db5f46df1ef47e232b09a4a41cab19b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\diagrams\\phase1_feature_pipeline.png": {
+    "mtime": 1779887682.9240465,
+    "ast_hash": "ccb052b36fbe01b14da3e414c1a4ca25",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\diagrams\\phase2_workflow.png": {
+    "mtime": 1779890186.6089113,
+    "ast_hash": "cfaf5cca132de17f9c603826a10d91f4",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\diagrams\\phase3_jepa_architecture.png": {
+    "mtime": 1779887726.117839,
+    "ast_hash": "47dd457d8831c86b48481b19348c1999",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\SUBHAM\\Downloads\\Image restoration using JEPA\\diagrams\\phase4_workflow.png": {
+    "mtime": 1779890215.2938929,
+    "ast_hash": "a941503f25c66c3a67f612d5801325af",
+    "semantic_hash": ""
+  }
+}

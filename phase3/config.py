@@ -35,7 +35,7 @@ MASK_RATIO_MAX = 0.60
 # -- Model Architecture Dimensions
 HYBRID_DIM = 989     # Vector output from Phase 2.5
 STYLE_EMBED_DIM = 256
-VIT_EMBED_DIM = 256
+VIT_EMBED_DIM = 768
 
 # -- Context/Target Encoder (ViT-Small equivalent)
 ENC_DEPTH = 6
@@ -52,8 +52,8 @@ PRED_DROPOUT = 0.1
 # -- Training Hyperparameters
 BATCH_SIZE = 16
 EPOCHS = 30
-LR = 3e-4
-WEIGHT_DECAY = 1e-5
+LR = 1e-4
+WEIGHT_DECAY = 1e-4
 
 # -- EMA Momentum (Target Encoder tracking)
 EMA_MOMENTUM_BASE = 0.996
@@ -61,7 +61,7 @@ EMA_MOMENTUM_MAX = 1.0
 
 # -- Loss Coefficients
 LATENT_LOSS_WEIGHT = 1.0
-PIXEL_LOSS_WEIGHT = 0.1
+PIXEL_LOSS_WEIGHT = 0.5
 
 # -- Model Checkpoint Paths
 PROJECTOR_PATH = os.path.join(FEATURES_DIR, "jepa_style_projector.pt")

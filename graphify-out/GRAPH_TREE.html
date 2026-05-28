@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Image Restoration using JEPA — graphify tree viewer</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f9f9f9;
+      color: #333;
+    }
+    h1 {
+      margin: 20px 0 0 24px;
+      font-size: 2.2rem;
+      font-weight: bold;
+      color: #1e3a56;
+    }
+    .controls {
+      margin: 20px 0 15px 24px;
+    }
+    button {
+      margin-right: 10px;
+      padding: 8px 18px;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.2s ease-in-out;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    button:active {
+      background: #004085;
+    }
+    #tree-container {
+      width: calc(100vw - 48px); /* Adjust for body margin/padding */
+      height: 85vh;
+      overflow: auto;
+      border-radius: 8px;
+      background: #fff;
+      margin-left: 24px;
+      margin-right: 24px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      border: 1px solid #ddd;
+    }
+    svg {
+      background: #fff;
+      border-radius: 8px;
+      display: block; /* Important for D3 */
+    }
+    .node circle {
+      stroke-width: 2.5px;
+    }
+    .node text { /* Base style for the <text> container */
+      font: 13px 'Segoe UI', sans-serif;
+      paint-order: stroke fill; /* Ensures text is readable over lines */
+      stroke: #fff; /* White halo */
+      stroke-width: 3px; /* Halo thickness */
+      stroke-linejoin: round;
+      stroke-opacity: 0.85; /* Halo opacity */
+    }
+    .link {
+      fill: none;
+      stroke-opacity: 0.7;
+      stroke-width: 2px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Image Restoration using JEPA — Knowledge Graph</h1>
+  <div class="controls">
+    <button onclick="expandAll()">Expand All</button>
+    <button onclick="collapseAll()">Collapse All</button>
+    <button onclick="resetView()">Reset View</button>
+  </div>
+  <div id="tree-container">
+    <svg id="tree-svg" width="6000" height="8000"></svg>
+  </div>
+
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script>
+    const initialJsonData = {"name":"Image Restoration using JEPA","total_count":432,"children":[{"name":"ANTIGRAVITY_Improvement_Plan.md","total_count":66,"children":[{"name":"1. Current State: What Is Actually Broken","total_count":1,"children":[]},{"name":"2. Approach A — Pretrained ViT Backbone (Highest Impact)","total_count":1,"children":[]},{"name":"3. Approach B — FiLM Style Conditioning","total_count":1,"children":[]},{"name":"4. Approach C — Convolutional Pixel Decoder","total_count":1,"children":[]},{"name":"5. Approach D — Perceptual + Style Loss","total_count":1,"children":[]},{"name":"6. Approach E — Diffusion Decoder (Advanced)","total_count":1,"children":[]},{"name":"7. Approach F — Scale the Dataset","total_count":1,"children":[]},{"name":"8. Implementation Roadmap","total_count":1,"children":[]},{"name":"9. Expected Results After Each Fix","total_count":1,"children":[]},{"name":"ANTIGRAVITY — Reconstruction Quality Improvement Plan","total_count":1,"children":[]},{"name":"ANTIGRAVITY_Improvement_Plan.md","total_count":1,"children":[]},{"name":"Architecture Overview","total_count":1,"children":[]},{"name":"code:bash (python phase3/run_phase3.py --epochs 20)","total_count":1,"children":[]},{"name":"code:block13 (Corrupted Image)","total_count":1,"children":[]},{"name":"code:python (# Add at the top of train_jepa.py)","total_count":1,"children":[]},{"name":"code:python (# CURRENT (BROKEN): 2-layer MLP decoding art texture)","total_count":1,"children":[]},{"name":"code:python (# CURRENT (BROKEN): L2 averages all plausible reconstruction)","total_count":1,"children":[]},{"name":"code:python (# CURRENT (BROKEN): Randomly initialized)","total_count":1,"children":[]},{"name":"code:python (# CURRENT (BROKEN): Style is just one token in a 197-token s)","total_count":1,"children":[]},{"name":"code:python (# Differential learning rates for pretrained vs new componen)","total_count":1,"children":[]},{"name":"code:python (# Initialize the perceptual loss module ONCE before the trai)","total_count":1,"children":[]},{"name":"code:python (# Remove the cap — use all available images)","total_count":1,"children":[]},{"name":"code:python (# Update these constants)","total_count":1,"children":[]},{"name":"code:python (# Use stronger augmentation for training)","total_count":1,"children":[]},{"name":"code:python (# ── New Module: FiLM Conditioning Layer ───────────────────)","total_count":1,"children":[]},{"name":"code:python (class PixelDecoder(nn.Module):)","total_count":1,"children":[]},{"name":"code:python (import timm)","total_count":1,"children":[]},{"name":"code:python (import torch)","total_count":1,"children":[]},{"name":"code:python (PIXEL_LOSS_WEIGHT = 0.5   # Increase from 0.1)","total_count":1,"children":[]},{"name":"code:python (VIT_EMBED_DIM       = 768    # Match pretrained ViT-B/16)","total_count":1,"children":[]},{"name":"Exact Code Change","total_count":1,"children":[]},{"name":"Exact Code Change","total_count":1,"children":[]},{"name":"Exact Code Change","total_count":1,"children":[]},{"name":"Exact Code Change","total_count":1,"children":[]},{"name":"Exact Code Change","total_count":1,"children":[]},{"name":"Expected Impact","total_count":1,"children":[]},{"name":"Expected Impact","total_count":1,"children":[]},{"name":"Expected Impact","total_count":1,"children":[]},{"name":"Expected Impact","total_count":1,"children":[]},{"name":"Expected Impact","total_count":1,"children":[]},{"name":"Expected Impact","total_count":1,"children":[]},{"name":"From Broken Baselines to Style-Faithful Art Restoration","total_count":1,"children":[]},{"name":"Key Files to Create","total_count":1,"children":[]},{"name":"Phase 1: Emergency Fixes (Week 1) — Target: Beat OpenCV Baseline","total_count":1,"children":[]},{"name":"Phase 2: Loss Improvements (Week 2) — Target: Real Style Consistency","total_count":1,"children":[]},{"name":"Phase 3: Data + Advanced Architecture (Week 3–4) — Target: Publication Quality","total_count":1,"children":[]},{"name":"Phase 4 Results (The Problem in Numbers)","total_count":1,"children":[]},{"name":"Quick Reference: Files to Touch and Why","total_count":1,"children":[]},{"name":"Recommended Config After All Changes","total_count":1,"children":[]},{"name":"Root Cause 1 — Training From Scratch on 4,000 Images","total_count":1,"children":[]},{"name":"Root Cause 2 — Style Conditioning Is Being Ignored","total_count":1,"children":[]},{"name":"Root Cause 3 — The PixelDecoder Is a 2-Layer MLP","total_count":1,"children":[]},{"name":"Root Cause 4 — L2 Pixel Loss Produces Blur","total_count":1,"children":[]},{"name":"Root Cause 5 — EMA Target Encoder Starts Random","total_count":1,"children":[]},{"name":"Table of Contents","total_count":1,"children":[]},{"name":"What It Is","total_count":1,"children":[]},{"name":"What It Is","total_count":1,"children":[]},{"name":"What It Is","total_count":1,"children":[]},{"name":"What It Is","total_count":1,"children":[]},{"name":"What It Is","total_count":1,"children":[]},{"name":"What It Is","total_count":1,"children":[]},{"name":"Why It Fixes the Problem","total_count":1,"children":[]},{"name":"Why It Fixes the Problem","total_count":1,"children":[]},{"name":"Why It Fixes the Problem","total_count":1,"children":[]},{"name":"Why It Fixes the Problem","total_count":1,"children":[]},{"name":"Why It Fixes the Problem","total_count":1,"children":[]}]},{"name":"diagrams","total_count":2,"children":[{"name":"readme.md","total_count":2,"children":[{"name":"Diagrams","total_count":1,"children":[]},{"name":"readme.md","total_count":1,"children":[]}]}]},{"name":"HISTORIC_IMAGE_RESTORATION_OVERVIEW.md","total_count":42,"children":[{"name":"1. Baseline Classifiers","total_count":1,"children":[]},{"name":"1. Extract Features (Phase 1)","total_count":1,"children":[]},{"name":"1. Quantitative Evaluator","total_count":1,"children":[]},{"name":"1. Texture Features (GLCM)","total_count":1,"children":[]},{"name":"1. The Masking Pipeline","total_count":1,"children":[]},{"name":"2. Architecture & Components ([`phase3/models.py`](file:///c:/Users/SUBHAM/Downloads/Image%20restoration%20using%20JEPA/phase3/models.py))","total_count":1,"children":[]},{"name":"2. Local Structures (LBP)","total_count":1,"children":[]},{"name":"2. The 5-Mode Gradio Web Application ([`phase4/gradio_app.py`](file:///c:/Users/SUBHAM/Downloads/Image%20restoration%20using%20JEPA/phase4/gradio_app.py))","total_count":1,"children":[]},{"name":"2. Train Classifiers & Run Ablations (Phase 2)","total_count":1,"children":[]},{"name":"2. Visualizations & Explainability","total_count":1,"children":[]},{"name":"3. Beta Grid Search (Phase 2.5)","total_count":1,"children":[]},{"name":"3. Color Histograms","total_count":1,"children":[]},{"name":"3. Loss Optimization","total_count":1,"children":[]},{"name":"3. Train Style-Conditioned I-JEPA (Phase 3)","total_count":1,"children":[]},{"name":"4. Deep CNN Representation","total_count":1,"children":[]},{"name":"4. Run Model Evaluation Suite (Phase 4)","total_count":1,"children":[]},{"name":"4. Training Visualizations","total_count":1,"children":[]},{"name":"5. Launch Live Gradio Web Server (Phase 4)","total_count":1,"children":[]},{"name":"code:cmd (.\\venv\\Scripts\\activate.bat)","total_count":1,"children":[]},{"name":"code:mermaid (flowchart TD)","total_count":1,"children":[]},{"name":"code:powershell (# Executes using the virtual environment's interpreter and d)","total_count":1,"children":[]},{"name":"code:powershell ($env:PYTHONIOENCODING='utf-8'; .\\venv\\Scripts\\python.exe -u )","total_count":1,"children":[]},{"name":"code:powershell ($env:PYTHONIOENCODING='utf-8'; .\\venv\\Scripts\\python.exe pha)","total_count":1,"children":[]},{"name":"code:powershell ($env:PYTHONIOENCODING='utf-8'; .\\venv\\Scripts\\python.exe pha)","total_count":1,"children":[]},{"name":"code:powershell ($env:PYTHONIOENCODING='utf-8'; .\\venv\\Scripts\\python.exe pha)","total_count":1,"children":[]},{"name":"code:powershell ($env:PYTHONIOENCODING='utf-8'; .\\venv\\Scripts\\python.exe pha)","total_count":1,"children":[]},{"name":"code:powershell (.\\venv\\Scripts\\Activate.ps1)","total_count":1,"children":[]},{"name":"code:text ([Original Image] ---> [EMA Target Encoder] ----> [Target Lat)","total_count":1,"children":[]},{"name":"code:text (Image restoration using JEPA/)","total_count":1,"children":[]},{"name":"Historic Image Restoration — Complete Architectural & Workflow Overview","total_count":1,"children":[]},{"name":"HISTORIC_IMAGE_RESTORATION_OVERVIEW.md","total_count":1,"children":[]},{"name":"How the `venv` is loaded and run:","total_count":1,"children":[]},{"name":"⚙️ Python Virtual Environment (`venv`) Guide","total_count":1,"children":[]},{"name":"🎨 Phase 1: Feature Extraction Pipeline","total_count":1,"children":[]},{"name":"📂 Project Directory Map","total_count":1,"children":[]},{"name":"📊 Phase 2 & 2.5: Classifiers, Explainability, & Grid Search","total_count":1,"children":[]},{"name":"🔍 Detailed Breakdown of System Phases","total_count":1,"children":[]},{"name":"🔮 Interactive 5-Mode Restoration Guide","total_count":1,"children":[]},{"name":"🗺️ System Architecture & Data Flow","total_count":1,"children":[]},{"name":"🚀 Phase 4: Metrics Evaluation & Gradio Interface","total_count":1,"children":[]},{"name":"🚀 Running the Orchestrators","total_count":1,"children":[]},{"name":"🟢 Phase 3: Style-Conditioned I-JEPA Training","total_count":1,"children":[]}]},{"name":"phase1","total_count":92,"children":[{"name":"assemble_features.py","total_count":16,"children":[{"name":"assemble_hybrid()","total_count":1,"children":[]},{"name":"Compute class weights for imbalance handling (used in Phase 2 training).","total_count":1,"children":[]},{"name":"compute_weights()","total_count":1,"children":[]},{"name":"Concatenate feature groups → (N, 989) hybrid matrix.","total_count":1,"children":[]},{"name":"Dimension sanity check — raise if any mismatch.","total_count":1,"children":[]},{"name":"Historic Image Restoration Phase 1 — Step 7: Feature Assembly & Splitting Conca","total_count":1,"children":[]},{"name":"Load all intermediate feature arrays and the image index.","total_count":1,"children":[]},{"name":"load_all_features()","total_count":1,"children":[]},{"name":"ndarray","total_count":1,"children":[]},{"name":"Save all npy files to features/ directory.","total_count":1,"children":[]},{"name":"Save feature_summary.csv: mean and std of each dimension per style class.     S","total_count":1,"children":[]},{"name":"save_all_outputs()","total_count":1,"children":[]},{"name":"save_feature_summary()","total_count":1,"children":[]},{"name":"split_data()","total_count":1,"children":[]},{"name":"Stratified 70/15/15 train/val/test split.","total_count":1,"children":[]},{"name":"verify_dimensions()","total_count":1,"children":[]}]},{"name":"config.py","total_count":1,"children":[{"name":"Historic Image Restoration Phase 1 — Central Configuration All paths, constants","total_count":1,"children":[]}]},{"name":"download_dataset.py","total_count":9,"children":[{"name":"Build a master list of all (image_path, class_idx) pairs.     Saves as image_in","total_count":1,"children":[]},{"name":"build_image_index()","total_count":1,"children":[]},{"name":"Download missing WikiArt images from HuggingFace Artificio/WikiArt and save to d","total_count":1,"children":[]},{"name":"download_wikiart()","total_count":1,"children":[]},{"name":"Generate style_mapping.json mapping integer index → class name.","total_count":1,"children":[]},{"name":"generate_style_mapping()","total_count":1,"children":[]},{"name":"Historic Image Restoration Phase 1 — Step 1: Dataset Download & Preparation (Str","total_count":1,"children":[]},{"name":"Verify and index the Indian Art-8 dataset from the local folder.","total_count":1,"children":[]},{"name":"verify_indian_art()","total_count":1,"children":[]}]},{"name":"extract_cnn.py","total_count":14,"children":[{"name":"apply_pca()","total_count":1,"children":[]},{"name":"bool","total_count":1,"children":[]},{"name":"Extract DINOv2 features: CLS token + intermediate layer patch averages.     Ret","total_count":1,"children":[]},{"name":"Extract multi-layer ResNet-50 features.     Returns concatenation of layer2 + l","total_count":1,"children":[]},{"name":"Extract raw (pre-PCA) CNN features for all images.     Returns (N, 4864) = DINO","total_count":1,"children":[]},{"name":"extract_dino_features()","total_count":1,"children":[]},{"name":"extract_raw_cnn_features()","total_count":1,"children":[]},{"name":"extract_resnet_features()","total_count":1,"children":[]},{"name":"Fit (or load) PCA and reduce raw CNN features to 512-dim.      Returns:","total_count":1,"children":[]},{"name":"Historic Image Restoration Phase 1 — Step 6: CNN Feature Extraction Extracts 51","total_count":1,"children":[]},{"name":"Load frozen DINOv2 and ResNet-50 models.","total_count":1,"children":[]},{"name":"load_models()","total_count":1,"children":[]},{"name":"ndarray","total_count":1,"children":[]},{"name":"Tensor","total_count":1,"children":[]}]},{"name":"extract_color.py","total_count":9,"children":[{"name":"_channel_hist()","total_count":1,"children":[]},{"name":"Compute a normalised histogram for one image channel (uint8).","total_count":1,"children":[]},{"name":"Extract 201-dim colour feature vector.      Args:         img_rgb : (H, W, 3)","total_count":1,"children":[]},{"name":"Extract colour features for all images in the index.      Args:         image","total_count":1,"children":[]},{"name":"extract_color()","total_count":1,"children":[]},{"name":"extract_color_all()","total_count":1,"children":[]},{"name":"Historic Image Restoration Phase 1 — Step 5: Color Feature Extraction Extracts","total_count":1,"children":[]},{"name":"int","total_count":1,"children":[]},{"name":"ndarray","total_count":1,"children":[]}]},{"name":"extract_glcm.py","total_count":6,"children":[{"name":"Extract 20-dim GLCM feature vector from a grayscale image.      Args:","total_count":1,"children":[]},{"name":"Extract GLCM features for all images in the index.      Args:         image_i","total_count":1,"children":[]},{"name":"extract_glcm()","total_count":1,"children":[]},{"name":"extract_glcm_all()","total_count":1,"children":[]},{"name":"Historic Image Restoration Phase 1 — Step 3: GLCM Feature Extraction Extracts 2","total_count":1,"children":[]},{"name":"ndarray","total_count":1,"children":[]}]},{"name":"extract_lbp.py","total_count":6,"children":[{"name":"Extract 256-dim LBP histogram from a grayscale image.      Args:         gray","total_count":1,"children":[]},{"name":"Extract LBP features for all images in the index.      Args:         image_in","total_count":1,"children":[]},{"name":"extract_lbp()","total_count":1,"children":[]},{"name":"extract_lbp_all()","total_count":1,"children":[]},{"name":"Historic Image Restoration Phase 1 — Step 4: LBP Feature Extraction Extracts 25","total_count":1,"children":[]},{"name":"ndarray","total_count":1,"children":[]}]},{"name":"preprocessing.py","total_count":7,"children":[{"name":"Historic Image Restoration Phase 1 — Step 2: Preprocessing Utilities Shared ima","total_count":1,"children":[]},{"name":"int","total_count":1,"children":[]},{"name":"Load an image and return it in all required colour spaces.      Returns:","total_count":1,"children":[]},{"name":"load_image_all_spaces()","total_count":1,"children":[]},{"name":"safe_load()","total_count":1,"children":[]},{"name":"str","total_count":1,"children":[]},{"name":"Wrapper around load_image_all_spaces with error handling.     Returns None on f","total_count":1,"children":[]}]},{"name":"run_phase1.py","total_count":11,"children":[{"name":"check_step()","total_count":1,"children":[]},{"name":"final_report()","total_count":1,"children":[]},{"name":"header()","total_count":1,"children":[]},{"name":"Historic Image Restoration Phase 1 — Master Orchestration Script Runs all Phase","total_count":1,"children":[]},{"name":"step1_verify_dataset()","total_count":1,"children":[]},{"name":"step2_glcm()","total_count":1,"children":[]},{"name":"step3_lbp()","total_count":1,"children":[]},{"name":"step4_color()","total_count":1,"children":[]},{"name":"step5_cnn()","total_count":1,"children":[]},{"name":"step6_assemble()","total_count":1,"children":[]},{"name":"step7_visualise()","total_count":1,"children":[]}]},{"name":"visualize.py","total_count":13,"children":[{"name":"Generate all three visualisation types for one sample per class.","total_count":1,"children":[]},{"name":"generate_all_visualisations()","total_count":1,"children":[]},{"name":"Historic Image Restoration Phase 1 — Step 8: Feature Visualisation Generates sa","total_count":1,"children":[]},{"name":"ndarray","total_count":1,"children":[]},{"name":"Pick one random image path per class.","total_count":1,"children":[]},{"name":"pick_sample_per_class()","total_count":1,"children":[]},{"name":"Plot 256-bin LBP histogram.","total_count":1,"children":[]},{"name":"Plot GLCM co-occurrence matrix at angle=0, distance=1.","total_count":1,"children":[]},{"name":"Plot original image alongside its K dominant colours.","total_count":1,"children":[]},{"name":"plot_color_palette()","total_count":1,"children":[]},{"name":"plot_glcm()","total_count":1,"children":[]},{"name":"plot_lbp_histogram()","total_count":1,"children":[]},{"name":"str","total_count":1,"children":[]}]}]},{"name":"phase2","total_count":42,"children":[{"name":"ablation_study.py","total_count":6,"children":[{"name":"Define slicing indices for the 4 feature groups.","total_count":1,"children":[]},{"name":"get_slices()","total_count":1,"children":[]},{"name":"Historic Image Restoration Phase 2 — Step 2: Feature Ablation Study Evaluates c","total_count":1,"children":[]},{"name":"Load pre-split numpy arrays from features/.","total_count":1,"children":[]},{"name":"load_data()","total_count":1,"children":[]},{"name":"run_ablation()","total_count":1,"children":[]}]},{"name":"optimize_hybrid_features.py","total_count":4,"children":[{"name":"Historic Image Restoration Phase 2.5 — Feature Normalization & Validation-Tuned","total_count":1,"children":[]},{"name":"Load raw split arrays.","total_count":1,"children":[]},{"name":"load_data()","total_count":1,"children":[]},{"name":"main()","total_count":1,"children":[]}]},{"name":"run_phase2.py","total_count":3,"children":[{"name":"compile_final_report()","total_count":1,"children":[]},{"name":"header()","total_count":1,"children":[]},{"name":"Historic Image Restoration Phase 2 — Master Orchestration Script Runs all Phase","total_count":1,"children":[]}]},{"name":"shap_analysis.py","total_count":5,"children":[{"name":"Generate meaningful feature names instead of simple indices.","total_count":1,"children":[]},{"name":"get_feature_names()","total_count":1,"children":[]},{"name":"Historic Image Restoration Phase 2 — Step 3: SHAP Feature Attribution Computes","total_count":1,"children":[]},{"name":"load_data()","total_count":1,"children":[]},{"name":"run_shap_analysis()","total_count":1,"children":[]}]},{"name":"train_classifiers.py","total_count":22,"children":[{"name":".__getitem__()","total_count":1,"children":[]},{"name":".__getitem__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".__len__()","total_count":1,"children":[]},{"name":".__len__()","total_count":1,"children":[]},{"name":".forward()","total_count":1,"children":[]},{"name":"ArtImageDataset","total_count":1,"children":[]},{"name":"Compute comprehensive accuracy, macro F1, and weighted F1 metrics.","total_count":1,"children":[]},{"name":"evaluate_model()","total_count":1,"children":[]},{"name":"Historic Image Restoration Phase 2 — Step 1: Model Training Trains 5 style clas","total_count":1,"children":[]},{"name":"HybridFeatureDataset","total_count":1,"children":[]},{"name":"Load pre-split numpy arrays from features/.","total_count":1,"children":[]},{"name":"load_data()","total_count":1,"children":[]},{"name":"main()","total_count":1,"children":[]},{"name":"StyleMLP","total_count":1,"children":[]},{"name":"train_cnn_end2end()","total_count":1,"children":[]},{"name":"train_mlp()","total_count":1,"children":[]},{"name":"train_rf()","total_count":1,"children":[]},{"name":"train_svm()","total_count":1,"children":[]},{"name":"train_xgboost()","total_count":1,"children":[]}]},{"name":"tsne_analysis.py","total_count":2,"children":[{"name":"Historic Image Restoration Phase 2 — Step 4: Representation t-SNE Analysis Appl","total_count":1,"children":[]},{"name":"run_tsne_analysis()","total_count":1,"children":[]}]}]},{"name":"phase3","total_count":83,"children":[{"name":"config.py","total_count":1,"children":[{"name":"Historic Image Restoration Phase 3 — central configuration for Style-Conditioned","total_count":1,"children":[]}]},{"name":"dataset.py","total_count":6,"children":[{"name":".__getitem__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".__len__()","total_count":1,"children":[]},{"name":"Historic Image Restoration Phase 3 — Style JEPA Dataset. Loads preprocessed raw","total_count":1,"children":[]},{"name":"split: 'train', 'val', or 'test'","total_count":1,"children":[]},{"name":"StyleJEPAImageDataset","total_count":1,"children":[]}]},{"name":"diffusion_decoder.py","total_count":21,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".add_noise()","total_count":1,"children":[]},{"name":".forward()","total_count":1,"children":[]},{"name":".forward()","total_count":1,"children":[]},{"name":".forward()","total_count":1,"children":[]},{"name":".sample()","total_count":1,"children":[]},{"name":"Add noise to clean patches x0 at timestep t.","total_count":1,"children":[]},{"name":"ConditionalResBlock","total_count":1,"children":[]},{"name":"DDIM-style fast sampling from the diffusion decoder.","total_count":1,"children":[]},{"name":"DDPM","total_count":1,"children":[]},{"name":"DDPM noise scheduler for patch-level diffusion.","total_count":1,"children":[]},{"name":"DiffusionPatchDecoder","total_count":1,"children":[]},{"name":"Historic Image Restoration Phase 3 — Conditional Diffusion Decoder. Implements D","total_count":1,"children":[]},{"name":"Residual block conditioned on time + style embeddings.","total_count":1,"children":[]},{"name":"SinusoidalPosEmb","total_count":1,"children":[]},{"name":"Small U-Net style denoising network for 16x16 patches.     Conditioned on:","total_count":1,"children":[]},{"name":"Standard sinusoidal time embedding for diffusion timestep.","total_count":1,"children":[]},{"name":"x_noisy : (B*N_tgt, 3, 16, 16)   noisy patch         t       : (B*N_tgt,)","total_count":1,"children":[]}]},{"name":"masking.py","total_count":7,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":".collate_masks()","total_count":1,"children":[]},{"name":".generate_mask()","total_count":1,"children":[]},{"name":"BlockMaskGenerator","total_count":1,"children":[]},{"name":"Generates a batch of masks.         Returns:             masks: BoolTensor of","total_count":1,"children":[]},{"name":"Generates a block-wise random mask with exactly target_masked patches.","total_count":1,"children":[]},{"name":"Historic Image Restoration Phase 3 — Block-Wise Masking Pipeline. Generates con","total_count":1,"children":[]}]},{"name":"models.py","total_count":31,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".forward()","total_count":1,"children":[]},{"name":".forward()","total_count":1,"children":[]},{"name":".forward()","total_count":1,"children":[]},{"name":".forward()","total_count":1,"children":[]},{"name":".forward()","total_count":1,"children":[]},{"name":".forward()","total_count":1,"children":[]},{"name":".forward()","total_count":1,"children":[]},{"name":".forward()","total_count":1,"children":[]},{"name":"Attention","total_count":1,"children":[]},{"name":"Convolutional pixel decoder.     Input : (B, N_tgt, embed_dim) latent predictio","total_count":1,"children":[]},{"name":"Feature-wise Linear Modulation.     Given a style vector s of shape (B, style_d","total_count":1,"children":[]},{"name":"FiLMLayer","total_count":1,"children":[]},{"name":"FiLMTransformerBlock","total_count":1,"children":[]},{"name":"Historic Image Restoration Phase 3 — Neural Network Models. Implements:   1. S","total_count":1,"children":[]},{"name":"PixelDecoder","total_count":1,"children":[]},{"name":"StyleConditionedPredictor","total_count":1,"children":[]},{"name":"StyleProjector","total_count":1,"children":[]},{"name":"TransformerBlock","total_count":1,"children":[]},{"name":"ViTContextEncoder","total_count":1,"children":[]},{"name":"x     : (B, N, feat_dim)         style : (B, style_dim)","total_count":1,"children":[]},{"name":"x: (B, 3, 224, 224)         mask: (B, 196) Boolean tensor where True is masked","total_count":1,"children":[]},{"name":"z_ctx: (B, N_ctx, embed_dim) Context latents from encoder.         s_emb: (B, s","total_count":1,"children":[]},{"name":"z_tgt_pred: (B, N_tgt, embed_dim)         Returns   : (B, N_tgt, 3, 16, 16)","total_count":1,"children":[]}]},{"name":"run_phase3.py","total_count":3,"children":[{"name":"# NOTE: Do NOT wrap sys.stdout with TextIOWrapper here — it re-buffers","total_count":1,"children":[]},{"name":"Historic Image Restoration Phase 3 — Style-Conditioned I-JEPA Reconstruction Orc","total_count":1,"children":[]},{"name":"main()","total_count":1,"children":[]}]},{"name":"train_jepa.py","total_count":14,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":".forward()","total_count":1,"children":[]},{"name":".gram_matrix()","total_count":1,"children":[]},{"name":".normalize_for_vgg()","total_count":1,"children":[]},{"name":"Computes VGG-based perceptual loss + Gram matrix style loss.     Uses VGG-16 fe","total_count":1,"children":[]},{"name":"Executes the self-supervised style-conditioned I-JEPA training run.","total_count":1,"children":[]},{"name":"extract_patches()","total_count":1,"children":[]},{"name":"Folds a batch of patches of shape (B, 196, 3, 16, 16)     back into a batch of","total_count":1,"children":[]},{"name":"Historic Image Restoration Phase 3 — Style-Conditioned I-JEPA Training Suite. I","total_count":1,"children":[]},{"name":"PerceptualStyleLoss","total_count":1,"children":[]},{"name":"pred, target: (B, 3, H, W) in [-1, 1]         Returns: perceptual_loss, style_l","total_count":1,"children":[]},{"name":"reconstruct_image()","total_count":1,"children":[]},{"name":"run_training()","total_count":1,"children":[]},{"name":"Slices a batch of images of shape (B, 3, 224, 224)     into non-overlapping pat","total_count":1,"children":[]}]}]},{"name":"phase4","total_count":60,"children":[{"name":"config.py","total_count":1,"children":[{"name":"Historic Image Restoration Phase 4 — Configuration Defines paths, constants, an","total_count":1,"children":[]}]},{"name":"evaluator.py","total_count":26,"children":[{"name":".__init__()","total_count":1,"children":[]},{"name":".__init__()","total_count":1,"children":[]},{"name":".calculate_statistics()","total_count":1,"children":[]},{"name":".compute_fid()","total_count":1,"children":[]},{"name":".evaluate_all()","total_count":1,"children":[]},{"name":".extract_dino_features_local()","total_count":1,"children":[]},{"name":".extract_hybrid_features_in_memory()","total_count":1,"children":[]},{"name":".extract_resnet_features_local()","total_count":1,"children":[]},{"name":".generate_report()","total_count":1,"children":[]},{"name":".get_features()","total_count":1,"children":[]},{"name":".run_classical_inpaint()","total_count":1,"children":[]},{"name":".run_reconstruction()","total_count":1,"children":[]},{"name":"Computes Fréchet Distance between two multivariate Gaussians.","total_count":1,"children":[]},{"name":"Computes Fréchet Inception Distance using PyTorch's InceptionV3 model.","total_count":1,"children":[]},{"name":"Computes mean and covariance of extracted features.","total_count":1,"children":[]},{"name":"Extract DINOv2 intermediate features for style fidelity checks.","total_count":1,"children":[]},{"name":"Extract Inception V3 features.         images_tensor: shape (B, 3, 224, 224) in","total_count":1,"children":[]},{"name":"Extract ResNet-50 intermediate features for style fidelity checks.","total_count":1,"children":[]},{"name":"Extracts 989-dim hybrid feature vector for a reconstructed image.         img_t","total_count":1,"children":[]},{"name":"FIDCalculator","total_count":1,"children":[]},{"name":"Generates a detailed, beautiful ASCII evaluation report.","total_count":1,"children":[]},{"name":"Historic Image Restoration Phase 4 — Core Evaluation and Metrics Engine Compute","total_count":1,"children":[]},{"name":"Phase4Evaluator","total_count":1,"children":[]},{"name":"Runs batch reconstruction using the style-conditioned predictor & decoder.","total_count":1,"children":[]},{"name":"Runs OpenCV Fast Inpainting (Telea) as classical baseline.         imgs: torch.","total_count":1,"children":[]},{"name":"Runs the complete Phase 4 evaluation pipeline.","total_count":1,"children":[]}]},{"name":"gradio_app.py","total_count":27,"children":[{"name":"_compute_metrics()","total_count":1,"children":[]},{"name":"_extract_dino()","total_count":1,"children":[]},{"name":"_extract_resnet()","total_count":1,"children":[]},{"name":"_opencv_inpaint()","total_count":1,"children":[]},{"name":"_reconstruct()","total_count":1,"children":[]},{"name":"_style_chart()","total_count":1,"children":[]},{"name":"build_app()","total_count":1,"children":[]},{"name":"Classical OpenCV Telea inpainting. Returns PIL image.","total_count":1,"children":[]},{"name":"detect_corrupted_patches()","total_count":1,"children":[]},{"name":"extract_hybrid()","total_count":1,"children":[]},{"name":"extract_pil_image()","total_count":1,"children":[]},{"name":"Extracts a PIL Image robustly from different Gradio outputs     (dict, filepath","total_count":1,"children":[]},{"name":"Gradio callback supporting 5 modes.","total_count":1,"children":[]},{"name":"Historic Image Restoration Phase 4 -- Interactive Gradio Web Application End-to","total_count":1,"children":[]},{"name":"img_tensor : (1, 3, 224, 224) on CPU, range [-1, 1]     style_vec_np: (989,) fl","total_count":1,"children":[]},{"name":"img_tensor: (1, 3, 224, 224) on CPU, range [-1, 1]     Returns a (196,) BoolTen","total_count":1,"children":[]},{"name":"img_tensor: torch (3, 224, 224) in [-1, 1]. Returns (989,) float32.","total_count":1,"children":[]},{"name":"overlay_mask()","total_count":1,"children":[]},{"name":"Overlays a semi-transparent color on the masked 16x16 patches.     pil_img: PIL","total_count":1,"children":[]},{"name":"PIL RGB -> torch (1, 3, 224, 224) [-1, 1].","total_count":1,"children":[]},{"name":"pil_to_tensor()","total_count":1,"children":[]},{"name":"resolve_image_path()","total_count":1,"children":[]},{"name":"run_inference()","total_count":1,"children":[]},{"name":"tensor_to_np()","total_count":1,"children":[]},{"name":"tensor_to_pil()","total_count":1,"children":[]},{"name":"torch (3, 224, 224) [-1, 1] -> float32 H x W x 3 in [0,1].","total_count":1,"children":[]},{"name":"torch (3, 224, 224) [-1, 1] -> PIL RGB.","total_count":1,"children":[]}]},{"name":"run_phase4.py","total_count":5,"children":[{"name":"Historic Image Restoration Phase 4 -- Master Orchestrator Supports two modes vi","total_count":1,"children":[]},{"name":"main()","total_count":1,"children":[]},{"name":"run_demo()","total_count":1,"children":[]},{"name":"run_evaluate()","total_count":1,"children":[]},{"name":"set_seeds()","total_count":1,"children":[]}]},{"name":"__init__.py","total_count":1,"children":[]}]},{"name":"README.md","total_count":45,"children":[{"name":"1. Global t-SNE Clustering (`visualizations/tsne_clustering.png`)","total_count":1,"children":[]},{"name":"1. Grayscale Texture (GLCM — 20 dimensions)","total_count":1,"children":[]},{"name":"1. Requirements Installation","total_count":1,"children":[]},{"name":"2. Feature Ablation Study Plot (`visualizations/ablation_study.png`)","total_count":1,"children":[]},{"name":"2. Micro-Texture Patterns (LBP — 256 dimensions)","total_count":1,"children":[]},{"name":"2. Run the Full Orchestration","total_count":1,"children":[]},{"name":"3. Color Signature (201 dimensions)","total_count":1,"children":[]},{"name":"3. Global SHAP Feature Importance (`visualizations/shap/global_importance.png`)","total_count":1,"children":[]},{"name":"3. Pipeline Smart Caching","total_count":1,"children":[]},{"name":"4. Deep Visual Representations (CNN — 512 dimensions)","total_count":1,"children":[]},{"name":"4. Style-Specific Beeswarm Explanations","total_count":1,"children":[]},{"name":"code:block1 ([ Raw Image ])","total_count":1,"children":[]},{"name":"code:block2 (Image restoration using JEPA/)","total_count":1,"children":[]},{"name":"code:block5 (Image restoration using JEPA/)","total_count":1,"children":[]},{"name":"code:block7 (┌──────────────────────────────────────────────┐)","total_count":1,"children":[]},{"name":"code:block8 (Image restoration using JEPA/)","total_count":1,"children":[]},{"name":"code:powershell ($env:PYTHONIOENCODING='utf-8'; .\\venv\\Scripts\\python.exe -u )","total_count":1,"children":[]},{"name":"code:powershell ($env:PYTHONIOENCODING='utf-8'; .\\venv\\Scripts\\python.exe pha)","total_count":1,"children":[]},{"name":"code:powershell ($env:PYTHONIOENCODING='utf-8'; .\\venv\\Scripts\\python.exe pha)","total_count":1,"children":[]},{"name":"code:powershell (.\\venv\\Scripts\\pip.exe install -r requirements.txt)","total_count":1,"children":[]},{"name":"Historic Image Restoration — Art Reconstruction System","total_count":1,"children":[]},{"name":"Phase 1: Data Pipeline & Hybrid Feature Extraction","total_count":1,"children":[]},{"name":"README.md","total_count":1,"children":[]},{"name":"⚖️ The Scale Imbalance & Representation Noise Challenge (Phase 2.5)","total_count":1,"children":[]},{"name":"⚙️ How the Feature Extractors Work","total_count":1,"children":[]},{"name":"🌌 Core Concept: Why Hybrid Features?","total_count":1,"children":[]},{"name":"🎨 Phase 2 & 2.5: Style Classification, Feature Ablation & Explanations","total_count":1,"children":[]},{"name":"🎨 Phase 3: Style-Conditioned I-JEPA Reconstruction Model","total_count":1,"children":[]},{"name":"🏗️ End-to-End System Architecture & Flow","total_count":1,"children":[]},{"name":"📁 Codebase Directory Structure","total_count":1,"children":[]},{"name":"📂 Phase 2 Directory Structure","total_count":1,"children":[]},{"name":"📂 Phase 3 Directory Layout","total_count":1,"children":[]},{"name":"📈 Classifier Performance Comparison (Test Partition)","total_count":1,"children":[]},{"name":"📈 Dataset Statistics & Classes","total_count":1,"children":[]},{"name":"📈 Verification Metrics","total_count":1,"children":[]},{"name":"📉 Joint Loss Optimization","total_count":1,"children":[]},{"name":"📊 Phase 3 Training & Performance Summary","total_count":1,"children":[]},{"name":"🔍 Interpretability & Diagnostic Visualizations","total_count":1,"children":[]},{"name":"🚀 Execution & Reproducibility","total_count":1,"children":[]},{"name":"🚀 Running Phase 2 Pipeline","total_count":1,"children":[]},{"name":"🚀 Running Phase 3 Model Training","total_count":1,"children":[]},{"name":"🛠️ Pipeline Architecture","total_count":1,"children":[]},{"name":"🛠️ The Mathematical Solution: Per-Block Normalization & SHAP-Weighted Beta Blending","total_count":1,"children":[]},{"name":"🛡️ The 5 Classifier Architectures","total_count":1,"children":[]},{"name":"🧪 Feature Ablation Study Results","total_count":1,"children":[]}]}]};
+
+    function transformData(jsonData) {
+        // Helper function to recursively build the children structure
+        function processNode(node, parentL1StageName) {
+            let displayName = node.name;
+            // Append total_count if it exists and is not already in the name
+            if (node.total_count !== undefined) {
+                if (!/\(Total Count: \d+\)$/.test(displayName)) {
+                    displayName += ` (Total Count: ${node.total_count})`;
+                }
+            }
+
+            const newNode = { name: displayName };
+
+            if (parentL1StageName === "Root") {
+                 newNode.originalStageName = node.name;
+            } else {
+                newNode.originalStageName = parentL1StageName;
+            }
+
+            if (node.children && node.children.length > 0) {
+                const stageNameToPass = (parentL1StageName === "Root") ? node.name : parentL1StageName;
+                newNode.children = node.children.map(child => processNode(child, stageNameToPass));
+            }
+
+            return newNode;
+        }
+
+        let rootDisplayName = jsonData.name;
+        if (jsonData.total_count !== undefined && !/\(Total Count: \d+\)$/.test(rootDisplayName)) {
+            rootDisplayName += ` (Total Count: ${jsonData.total_count})`;
+        }
+
+        return {
+            name: rootDisplayName,
+            originalStageName: "Root",
+            children: (jsonData.children || []).map(child => processNode(child, "Root"))
+        };
+    }
+
+    const treeData = transformData(initialJsonData);
+
+    // Auto-populated phaseColors: every depth-1 child of the root gets
+    // a stable colour from a bigger palette so all top-level dirs are
+    // distinguishable.
+    const PALETTE = [
+      ["#3498DB","#2980B9","#AED6F1"], ["#2ECC71","#27AE60","#A9DFBF"],
+      ["#E74C3C","#C0392B","#F5B7B1"], ["#9B59B6","#8E44AD","#D7BDE2"],
+      ["#F39C12","#D68910","#FAD7A0"], ["#1ABC9C","#117864","#A2D9CE"],
+      ["#34495E","#1B2631","#ABB2B9"], ["#E67E22","#BA4A00","#F5CBA7"],
+      ["#16A085","#0E6655","#A2D9CE"], ["#D35400","#A04000","#EDBB99"],
+      ["#7F8C8D","#566573","#D5DBDB"], ["#C0392B","#7B241C","#F5B7B1"],
+      ["#2E86C1","#1B4F72","#A9CCE3"], ["#28B463","#196F3D","#A9DFBF"],
+      ["#AF7AC5","#6C3483","#D2B4DE"],
+    ];
+    const phaseColors = { "Root": { fill: "#4A4A4A", stroke: "#333333", collapsedFill: "#6C757D" },
+                          "Default": { fill: "#BDC3C7", stroke: "#95A5A6", collapsedFill: "#ECF0F1" } };
+    (initialJsonData.children || []).forEach((c, i) => {
+      const pal = PALETTE[i % PALETTE.length];
+      phaseColors[c.name] = { fill: pal[0], stroke: pal[1], collapsedFill: pal[2] };
+    });
+
+    const levelSpecificPalettes = {
+      0: { fill: "#4A4A4A", stroke: "#333333", collapsedFill: "#6C757D" },
+      2: { fill: "#6ab04c", stroke: "#508a38", collapsedFill: "#a3d391" },
+      3: { fill: "#f0932b", stroke: "#d0730f", collapsedFill: "#f6c07e" },
+      4: { fill: "#be2edd", stroke: "#a01cb3", collapsedFill: "#e08bf2" },
+      5: { fill: "#00a8ff", stroke: "#007ac1", collapsedFill: "#74d2ff" },
+      6: { fill: "#e55039", stroke: "#c23620", collapsedFill: "#f09a8d" },
+      default: { fill: "#747d8c", stroke: "#57606f", collapsedFill: "#a4b0be" }
+    };
+
+    const svgElement = d3.select("#tree-svg");
+    const initialSvgWidth = +svgElement.attr("width");
+    const initialSvgHeight = +svgElement.attr("height");
+    const margin = { top: 40, right: 120, bottom: 80, left: 450 };
+    let width = initialSvgWidth - margin.left - margin.right;
+    let height = initialSvgHeight - margin.top - margin.bottom;
+    const duration = 500;
+    let nodeCounter = 0;
+    const g = svgElement.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+    const treemap = d3.tree().nodeSize([40, 0]);
+    let rootNode = d3.hierarchy(treeData, d => d.children);
+    rootNode.x0 = 0;
+    rootNode.y0 = 0;
+
+    if (rootNode.children) {
+      rootNode.children.forEach(d_child => {
+        if (d_child.children) { collapseBranch(d_child); }
+      });
+    }
+    updateTree(rootNode);
+
+    function collapseBranch(d) { if (d.children) { d._children = d.children; d._children.forEach(collapseBranch); d.children = null; } }
+    function expandBranch(d) { if (d._children) { d.children = d._children; d._children = null; } if (d.children) { d.children.forEach(expandBranch); } }
+    window.expandAll = () => { expandBranch(rootNode); updateTree(rootNode); };
+    window.collapseAll = () => { if (rootNode.children) { rootNode.children.forEach(collapseBranch); } updateTree(rootNode); };
+    window.resetView = () => { if (rootNode.children) { rootNode.children.forEach(d_child => { if (d_child.children || d_child._children) { collapseBranch(d_child); } }); } if (rootNode._children && !rootNode.children) { rootNode.children = rootNode._children; rootNode._children = null; } updateTree(rootNode); };
+
+    function updateTree(source) {
+      const treeLayoutData = treemap(rootNode);
+      let nodes = treeLayoutData.descendants();
+      let links = treeLayoutData.descendants().slice(1);
+
+      let minX = 0;
+      let maxX = 0;
+      if (nodes.length > 0) {
+        minX = d3.min(nodes, d => d.x);
+        maxX = d3.max(nodes, d => d.x);
+      }
+
+      let neededHeight = Math.max(initialSvgHeight, maxX - minX + margin.top + margin.bottom + 100);
+      svgElement.transition().duration(duration / 2).attr("height", neededHeight);
+      g.transition().duration(duration / 2).attr("transform", `translate(${margin.left},${margin.top - minX + 40})`);
+
+      nodes.forEach(d => { d.y = d.depth * 400; }); // Adjust horizontal separation if needed
+
+      const node = g.selectAll('g.node').data(nodes, d => d.id || (d.id = ++nodeCounter));
+      const nodeEnter = node.enter().append('g')
+        .attr('class', d => "node" + (d.children || d._children ? " node--internal" : " node--leaf") + (d._children ? " _children" : ""))
+        .attr('transform', d => `translate(${source.y0},${source.x0})`)
+        .on('click', (event, d) => { if (d.children) { d._children = d.children; d.children = null; } else if (d._children) { d.children = d._children; d._children = null; } updateTree(d); })
+        .style('cursor', d => (d.children || d._children) ? 'pointer' : 'default');
+
+      nodeEnter.append('circle').attr('r', 1e-6);
+
+      nodeEnter.append('text')
+        .attr('dy', '.35em')
+        .attr('x', d => d.children || d._children ? -14 : 14)
+        .attr('text-anchor', d => d.children || d._children ? 'end' : 'start')
+        .style("fill-opacity", 1e-6)
+        .call(wrapText, 380);
+
+      const nodeUpdate = nodeEnter.merge(node);
+      nodeUpdate.transition().duration(duration)
+        .attr('transform', d => `translate(${d.y},${d.x})`)
+        .attr('class', d => "node" + (d.children ? " node--internal" : " node--leaf") + (d._children ? " node--internal _children" : ""));
+
+      nodeUpdate.select('circle').attr('r', 8.5)
+        .style('fill', d => {
+            let palette;
+            if (d.depth === 0) {
+                palette = levelSpecificPalettes[0];
+            } else if (d.depth === 1) {
+                palette = phaseColors[d.data.originalStageName] || phaseColors.Default;
+            } else {
+                palette = levelSpecificPalettes[d.depth] || levelSpecificPalettes.default;
+            }
+            if (d._children) return palette.collapsedFill;
+            if (d.children) return palette.fill;
+            return "#fff";
+        })
+        .style('stroke', d => {
+            let palette;
+            if (d.depth === 0) {
+                palette = levelSpecificPalettes[0];
+            } else if (d.depth === 1) {
+                palette = phaseColors[d.data.originalStageName] || phaseColors.Default;
+            } else {
+                palette = levelSpecificPalettes[d.depth] || levelSpecificPalettes.default;
+            }
+            return palette.stroke;
+        });
+      nodeUpdate.select('text').style("fill-opacity", 1).call(wrapText, 380);
+
+      const nodeExit = node.exit().transition().duration(duration).attr('transform', d => `translate(${source.y},${source.x})`).remove();
+      nodeExit.select('circle').attr('r', 1e-6);
+      nodeExit.select('text').style('fill-opacity', 1e-6);
+
+      const link = g.selectAll('path.link').data(links, d => d.id);
+      const linkEnter = link.enter().insert('path', "g").attr('class', 'link').attr('d', d => { const o = { x: source.x0, y: source.y0 }; return diagonal(o, o); });
+
+      linkEnter.merge(link).transition().duration(duration).attr('d', d => diagonal(d, d.parent))
+        .style('stroke', d => {
+            const sourceNode = d.parent;
+            if (!sourceNode) return phaseColors.Default.stroke;
+            const l1AncestorName = sourceNode.data.originalStageName;
+            const colorPalette = phaseColors[l1AncestorName] || phaseColors.Default;
+            return colorPalette.stroke;
+        });
+      link.exit().transition().duration(duration).attr('d', d => { const o = { x: source.x, y: source.y }; return diagonal(o, o); }).remove();
+      nodes.forEach(d => { d.x0 = d.x; d.y0 = d.y; });
+    }
+
+    function diagonal(s, d) { return `M ${s.y} ${s.x} C ${(s.y + d.y) / 2} ${s.x}, ${(s.y + d.y) / 2} ${d.x}, ${d.y} ${d.x}`; }
+
+    function wrapText(textElements, maxWidth) {
+        const textPartColors = {
+            name: '#343a40',
+            count: '#0056b3'
+        };
+        const countRegex = /(\s\(Total Count: \d+\))$/;
+
+        textElements.each(function () {
+            const textD3 = d3.select(this);
+            const originalNodeText = textD3.datum().data.name;
+            const x = parseFloat(textD3.attr("x") || 0);
+            const initialDy = textD3.attr("dy");
+            const textAnchor = textD3.attr("text-anchor");
+            const lineHeight = 1.1;
+
+            textD3.text(null);
+
+            let namePart = originalNodeText;
+            let countPartText = "";
+
+            const countMatch = originalNodeText.match(countRegex);
+            if (countMatch && originalNodeText.endsWith(countMatch[0])) {
+                namePart = originalNodeText.substring(0, originalNodeText.length - countMatch[0].length).trim();
+                countPartText = countMatch[0].trim();
+            }
+
+            const tokens = [];
+            namePart.split(/\s+/).filter(Boolean).forEach(word => {
+                tokens.push({ text: word, type: 'name' });
+            });
+            if (countPartText) {
+                tokens.push({ text: countPartText, type: 'count' });
+            }
+
+            if (tokens.length === 0 && originalNodeText) {
+                tokens.push({ text: originalNodeText, type: 'name' });
+            }
+
+            let currentTspan = textD3.append("tspan").attr("x", x).attr("dy", initialDy);
+            if (textAnchor === "end") currentTspan.attr("text-anchor", "end");
+
+            let lineTokens = [];
+
+            for (let i = 0; i < tokens.length; i++) {
+                const tokenObj = tokens[i];
+
+                lineTokens.push(tokenObj);
+                currentTspan.text(lineTokens.map(t => t.text).join(" "));
+
+                if (currentTspan.node().getComputedTextLength() > maxWidth && lineTokens.length > 1) {
+                    lineTokens.pop();
+
+                    currentTspan.text(null);
+                    lineTokens.forEach((prevToken, idx) => {
+                        currentTspan.append("tspan")
+                            .text((idx > 0 ? " " : "") + prevToken.text)
+                            .style("fill", textPartColors[prevToken.type] || textPartColors.name)
+                            .style("font-weight", prevToken.type === 'count' ? "bold" : "normal");
+                    });
+
+                    lineTokens = [tokenObj];
+                    currentTspan = textD3.append("tspan").attr("x", x).attr("dy", lineHeight + "em");
+                    if (textAnchor === "end") currentTspan.attr("text-anchor", "end");
+                }
+            }
+
+            currentTspan.text(null);
+            lineTokens.forEach((token, idx) => {
+                currentTspan.append("tspan")
+                    .text((idx > 0 ? " " : "") + token.text)
+                    .style("fill", textPartColors[token.type] || textPartColors.name)
+                    .style("font-weight", token.type === 'count' ? "bold" : "normal");
+            });
+
+            if (textD3.selectAll("tspan > tspan").empty() && textD3.select("tspan").text().length === 0 && originalNodeText) {
+                let t = textD3.select("tspan");
+                let displayText = originalNodeText;
+                t.text(displayText).style("fill", textPartColors.name);
+                if (t.node() && t.node().getComputedTextLength() > maxWidth && displayText.length > 20) {
+                    let estimatedChars = Math.floor(maxWidth / (t.node().getComputedTextLength()/displayText.length) );
+                    displayText = displayText.substring(0, Math.max(0, estimatedChars - 3)) + "...";
+                    t.text(displayText);
+                }
+            }
+        });
+    }
+  </script>
+</body>
+</html>

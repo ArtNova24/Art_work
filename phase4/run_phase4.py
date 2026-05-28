@@ -60,7 +60,7 @@ def run_demo():
     print("============================================================")
     print("  Historic Image Restoration Phase 4 -- Interactive Gradio Demo")
     print("============================================================")
-    print("  Launching on http://127.0.0.1:7860 ...")
+    print("  Launching on http://localhost:7860 ...")
     print("  Press Ctrl+C to stop the server.")
     print("============================================================")
 
@@ -69,7 +69,7 @@ def run_demo():
         from phase4.gradio_app import build_app
         app, theme, css = build_app()
         app.launch(
-            server_name="127.0.0.1",
+            server_name="0.0.0.0",
             server_port=7860,
             share=False,
             show_error=True,
