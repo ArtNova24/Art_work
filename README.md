@@ -337,171 +337,122 @@ Image restoration using JEPA/
 │   └── shap/                     # SHAP Explainability plots
 │       ├── global_importance.png     # Global feature rank across all classes
 │       ├── baroque_beeswarm.png      # Baroque style feature impact
-│       ├── impressionism_beeswarm.png # Impressionism style feature impact
-│       ├── cubism_beeswarm.png       # Cubism style feature impact
-│       └── minimalism_beeswarm.png   # Minimalism style feature impact
-├── phase2/
-│   ├── optimize_hybrid_features.py # Grid search scaling and block normalizer
-│   ├── train_classifiers.py        # Master training logic for the 5 architectures
-│   ├── ablation_study.py           # Slices feature vectors and runs comparative SVM tests
-│   ├── tsne_analysis.py            # Computes t-SNE coordinate spaces and saves plot
-│   ├── shap_analysis.py            # Computes tree-based SHAP values and builds beeswarms
-│   └── run_phase2.py               # Orchestrator running the complete Phase 2/2.5 pipeline
-└── phase2_report.txt               # Plain-text performance summary card
-```
+│     ## 🎨 Phase 3: Style-Conditioned I-JEPA & Architectural Quality Improvements
 
-### 🚀 Running Phase 2 Pipeline
+In Phase 3, we implement and train the **Style-Conditioned I-JEPA (Image Joint Embedding Predictive Architecture)**. This model reconstructs corrupted, damaged, or physically missing regions of paintings by conditioning self-supervised latent prediction and pixel reconstruction directly on our 989-dimensional optimized hybrid style fingerprint.
 
-To execute the entire Phase 2 training, feature optimization, ablation, t-SNE, and SHAP suite:
-```powershell
-$env:PYTHONIOENCODING='utf-8'; .\venv\Scripts\python.exe phase2\run_phase2.py
-```
-*Note: The script features automatic model caching. If `mlp_classifier.pt` or `svm_classifier.pkl` exist, they will be loaded directly. To force a full retrain, delete the respective pickle or model files in `features/`.*
+To outperform classical local pixel-copying baselines, we implemented **six core quality improvements** to resolve initial training bottlenecks:
 
-**Phase 2 has concluded successfully, and our high-performance Hybrid Style Predictor is saved and fully primed to act as the conditioning context for our Self-Supervised Style-Conditioned I-JEPA Model in Phase 3!**
+### 1. Pretrained ViT-B/16 Backbone (MAE-Pretrained)
+* **What we did:** Replaced the randomly-initialized context encoder with a **MAE-pretrained ViT-B/16** backbone (`vit_base_patch16_224.mae` from `timm`) and mapped target tokens through a linear projection layer.
+* **Why:** Leverages ImageNet-level visual priors, enabling the self-supervised target encoder to output highly structured latent compositions from Epoch 1 instead of starting from random noise.
 
----
+### 2. FiLM Style Conditioning (Block-Wise)
+* **What we did:** Replaced the simple token-prepending method. We added `FiLMLayer` and `FiLMTransformerBlock` classes inside [models.py](file:///c:/Users/SUBHAM/Downloads/Image%20restoration%20using%20JEPA/phase3/models.py). The 989-dim style feature is projected to modulate the scale ($\gamma$) and bias ($\beta$) of transformer activations at *every* block in the predictor:
+  $$\text{FiLM}(\mathbf{x}) = (1 + \gamma(\mathbf{s})) \cdot \mathbf{x} + \beta(\mathbf{s})$$
+* **Why:** Forces the predictor to actively align its structure and color generations to the target style distribution instead of ignoring a single prepended token.
 
-## 🎨 Phase 3: Style-Conditioned I-JEPA Reconstruction Model
+### 3. Convolutional Pixel Decoder
+* **What we did:** Upgraded the shallow 2-layer MLP decoder to a transposed-convolutional decoder network:
+  $$\text{Linear}(512 \to 12544) \to \text{Reshape} \to \text{ConvTranspose2d}(256) \to \text{ConvTranspose2d}(128) \to \text{ConvTranspose2d}(64) \to \text{Conv2d}(3)$$
+* **Why:** Reconstructs crisp spatial details and eliminates blocky/pixelated artifact borders in the restored regions.
 
-In Phase 3, we implement and train the **Style-Conditioned I-JEPA (Image Joint Embedding Predictive Architecture)**. This model represents the core research contribution of the Historic Image Restoration project: it reconstructs corrupted, damaged, or physically missing regions of paintings by conditioning self-supervised latent prediction and pixel reconstruction directly on our 989-dimensional optimized hybrid style fingerprint.
+### 4. Perceptual + Style VGG Loss
+* **What we did:** Formulated a composite loss function combining L2 pixel distance, deep VGG perceptual features (VGG-16 layers `relu1_2`, `relu2_2`, `relu3_3`, `relu4_3`), and Gram-matrix-based style loss:
+  $$\mathcal{L}_{\text{joint}} = 0.5 \cdot \mathcal{L}_{\text{MSE}} + 0.3 \cdot \mathcal{L}_{\text{perceptual}} + 0.2 \cdot \mathcal{L}_{\text{style}}$$
+* **Why:** Ensures the decoder prioritizes semantic sharpness, clean contours, and correct brush stroke textures rather than minimizing mean squared error (which averages details into a blurry guess).
 
-Unlike standard, style-agnostic pixel inpainting, this architecture allows style embeddings to guide the structural synthesis and texture-matching of missing regions, achieving a style-faithful restoration.
+### 5. Differential Learning Rates & Data Augmentations
+* **What we did:** Set the pretrained ViT backbone to fine-tune at a smaller rate ($1\times 10^{-5}$) while training predictor and decoder layers at $1\times 10^{-4}$. Added training data augmentations (random cropping, horizontal flips, color jitter, and rotation).
 
----
-
-### 🏗️ End-to-End System Architecture & Flow
-
-The style-conditioned reconstruction pipeline operates as follows:
-
-```
-                  ┌──────────────────────────────────────────────┐
-                  │   Intact Style Feature Vector (989 dims)     │
-                  └──────────────────────┬───────────────────────┘
-                                         │
-                                         ▼ (StyleProjector MLP)
-                  ┌──────────────────────────────────────────────┐
-                  │      Style Embedding Token (256 dims)        │
-                  └──────────────────────┬───────────────────────┘
-                                         │
-                                         ▼ (Prepend to sequence)
-  ┌──────────────┐         ┌─────────────┴──────────────┐         ┌──────────────┐
-  │ Context      │ ──────► │ Style-Conditioned Predictor│ ◄───── │ Learnable    │
-  │ Latents      │         │ (Transformer Decoder)      │         │ Mask Tokens  │
-  └──────────────┘         └─────────────┬──────────────┘         └──────────────┘
-                                         │
-                                         ▼ (Latent L2 Loss)
-                               ┌───────────────────┐
-                               │ Predicted Target  │
-                               │ Latents (256-dim) │
-                               └─────────┬─────────┘
-                                         │
-                                         ▼ (PixelDecoder MLP)
-                               ┌───────────────────┐
-                               │ Decoded Target    │ ◄─── (Pixel L2 Loss)
-                               │ Patches (16x16x3) │
-                               └───────────────────┘
-```
-
-1. **Block-Wise Masking Pipeline (`phase3/masking.py`)**:
-   We divide $224 \times 224 \times 3$ images into a grid of $14 \times 14 = 196$ non-overlapping patches (size $16 \times 16 \times 3$). Rather than standard random masking, we implement **Block-Wise Masking** (simulating physical artwork damage like scratches, surface tears, or fading) by sampling a random mask ratio between **40% and 60%**.
-   * **Context Patches ($N_{ctx}$)**: Intact patches passed to the encoder.
-   * **Target Patches ($N_{tgt}$)**: Masked patches to be reconstructed.
-
-2. **Style Projector (`phase3/models.py` $\to$ `StyleProjector`)**:
-   A 2-layer Multi-Layer Perceptron (MLP) with Layer Normalization that maps the 989-dimensional optimized hybrid feature vector (capturing color, texture, and CNN semantics) to a joint latent space representation:
-   $$\mathbf{s}_{\text{emb}} = \text{LayerNorm}(\mathbf{W}_2 \cdot \text{ReLU}(\text{LayerNorm}(\mathbf{W}_1 \cdot \mathbf{x}_{\text{hybrid}} + \mathbf{b}_1)) + \mathbf{b}_2) \in \mathbb{R}^{256}$$
-
-3. **Context & Target Encoders (`phase3/models.py` $\to$ `ViTContextEncoder`)**:
-   * **Context Encoder**: A custom 6-layer Vision Transformer (ViT-Small/16 equivalent, 8 attention heads, 256 embedding dimensions). It processes *only* the visible context patches (appended to their 1D learnable positional encodings) to output context latents $\mathbf{Z}_{\text{ctx}} \in \mathbb{R}^{N_{\text{ctx}} \times 256}$. This strict spatial boundary prevents information leakage from masked regions.
-   * **Target Encoder**: Identical in structure to the Context Encoder but updated via **Exponential Moving Average (EMA)** tracking with stop-gradients:
-     $$\theta_{\text{target}} \leftarrow m \cdot \theta_{\text{target}} + (1 - m) \cdot \theta_{\text{context}}$$
-     Where $m$ schedules smoothly from $0.996$ to $1.0$ via a cosine schedule. It processes the *entire* image to output ground-truth target representations $\mathbf{Z}_{\text{target, gt}} \in \mathbb{R}^{N_{\text{tgt}} \times 256}$.
-
-4. **Style-Conditioned Predictor (`phase3/models.py` $\to$ `StyleConditionedPredictor`)**:
-   A 4-layer Transformer Decoder that routes context and style constraints to predict target representations. We inject style conditioning by prepending the 256-dimensional style token $\mathbf{s}_{\text{emb}}$ as the very first token in the predictor's input sequence:
-   $$\mathbf{H}_{\text{in}} = \left[ \mathbf{s}_{\text{emb}}; \; \mathbf{Z}_{\text{ctx}} + \mathbf{P}_{\text{ctx}}; \; \mathbf{M}_{\text{tgt}} + \mathbf{P}_{\text{tgt}} \right]$$
-   Where $\mathbf{M}$ is a shared, learnable masked-patch token and $\mathbf{P}$ are positional encodings. Self-attention layers naturally route and blend the style constraints across all target patch predictions, outputting $\mathbf{Z}_{\text{target, pred}} \in \mathbb{R}^{N_{\text{tgt}} \times 256}$.
-
-5. **Pixel Decoder (`phase3/models.py` $\to$ `PixelDecoder`)**:
-   A lightweight 2-layer MLP mapped over each predicted latent patch, returning them directly to raw pixel space ($16 \times 16 \times 3$) to allow visual inspection of art restoration progress.
-
----
-
-### 📉 Joint Loss Optimization
-
-The network optimizes two losses in tandem via a joint loss function:
-$$\mathcal{L}_{\text{joint}} = \mathcal{L}_{\text{latent}} + 0.1 \cdot \mathcal{L}_{\text{pixel}}$$
-
-1. **Latent L2 Loss**: Minimizes the mean squared error (MSE) between predicted target latents and ground-truth target representations produced by the EMA encoder:
-   $$\mathcal{L}_{\text{latent}} = \text{MSE}(\mathbf{Z}_{\text{target, pred}}, \text{StopGrad}(\mathbf{Z}_{\text{target, gt}}))$$
-2. **Pixel L2 Loss**: Computes standard MSE between the decoded patches and original pixel patches:
-   $$\mathcal{L}_{\text{pixel}} = \text{MSE}(\mathbf{X}_{\text{target, decoded}}, \mathbf{X}_{\text{target, original}})$$
-
----
-
-### 📊 Phase 3 Training & Performance Summary
-
-Training was executed successfully on a local GPU. The training loop automatically logs losses and exports side-by-side visual reconstruction grids to `visualizations/reconstructions/epoch_XX.png` at every epoch.
-
-* **Hardware**: CUDA GPU (NVIDIA GeForce RTX 3060)
-* **Dataset Size**: 4,137 training samples
-* **Total Training Duration**: 34.0 minutes
-* **Best Validation Loss**: **`0.14519`** (Saved at Epoch 1)
-* **Epoch-wise Loss Trajectory**:
-
-| Epoch | Learning Rate | EMA Momentum | Train Loss | Latent Loss | Pixel Loss | Val Loss | Status / Action |
-| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| **01** | $2.97 \times 10^{-4}$ | 0.9960 | **0.24218** | 0.22090 | 0.21281 | **0.14519** | 💾 *Best Checkpoint Saved* |
-| **03** | $2.71 \times 10^{-4}$ | 0.9962 | 0.18064 | 0.16255 | 0.18092 | 0.17877 | Training stable |
-| **06** | $1.96 \times 10^{-4}$ | 0.9970 | 0.18305 | 0.16702 | 0.16034 | 0.18138 | Gradient flow smooth |
-| **09** | $1.04 \times 10^{-4}$ | 0.9982 | 0.19803 | 0.18324 | 0.14794 | 0.20685 | Pixel loss steadily drops |
-| **12** | $2.86 \times 10^{-5}$ | 0.9993 | 0.20327 | 0.18919 | 0.14084 | 0.22163 | Latent layers converged |
-| **15** | $0.00$ | 1.0000 | 0.20097 | 0.18721 | **0.13761** | 0.22303 | 🏆 *Training complete* |
-
-> [!TIP]
-> The **Pixel Loss** decreases consistently throughout training—dropping from `0.21281` down to `0.13761` at Epoch 15 (a **35% reduction** in direct pixel error). This demonstrates that the joint optimizer successfully pushes the Pixel Decoder to generate highly resolved, crisp image restorations while maintaining latent semantic alignment.
+### 6. Advanced Diffusion Decoder (`diffusion_decoder.py`)
+* **What we did:** Created a standalone conditional patch-level diffusion decoder ([diffusion_decoder.py](file:///c:/Users/SUBHAM/Downloads/Image%20restoration%20using%20JEPA/phase3/diffusion_decoder.py)) with sinusoidal timestep embeddings, conditional ResNet blocks, and a DDPM/DDIM scheduler, ready to act as a high-fidelity alternative.
 
 ---
 
 ### 📂 Phase 3 Directory Layout
 
-Our final codebase structure adds the dedicated `phase3/` source modules and serialized model weights:
-
 ```
-Image restoration using JEPA/
-├── features/
-│   ├── jepa_style_projector.pt   # Style Projector checkpoint (2.5 MB)
-│   ├── jepa_context_encoder.pt   # ViT Context Encoder checkpoint (19.9 MB)
-│   ├── jepa_predictor.pt         # Transformer Predictor checkpoint (12.8 MB)
-│   ├── jepa_pixel_decoder.pt     # Pixel Decoder checkpoint (2.1 MB)
-│   └── jepa_target_encoder.pt    # ViT Target Encoder checkpoint (19.9 MB)
-├── visualizations/
-│   └── reconstructions/          # Side-by-side epoch restoration visual cards
-│       ├── epoch_1.png           # Original | Masked | Reconstructed (Epoch 1)
-│       ├── epoch_5.png           # Original | Masked | Reconstructed (Epoch 5)
-│       ├── epoch_10.png          # Original | Masked | Reconstructed (Epoch 10)
-│       └── epoch_15.png          # Original | Masked | Reconstructed (Epoch 15)
-├── phase3/
-│   ├── config.py                 # Central configurations and hardware mappings
-│   ├── masking.py                # Block-wise random mask generator logic
-│   ├── models.py                 # Custom PyTorch modules (MLP, ViT, Decoder)
-│   ├── dataset.py                # Dual dataset (images + Phase 2.5 optimized vectors)
-│   ├── train_jepa.py             # Joint training and EMA tracking logic
-│   └── run_phase3.py             # Orchestrator and command-line harness
+phase3/
+├── config.py                 # Central configurations and hardware mappings
+├── masking.py                # Block-wise random mask generator logic
+├── models.py                 # Custom PyTorch modules (MAE ViT, FiLM block, Conv Decoder)
+├── dataset.py                # Dual dataset (images + Phase 2.5 optimized vectors)
+├── train_jepa.py             # Perceptual VGG loss, joint training, and EMA tracking
+├── diffusion_decoder.py      # Standalone patch-level DDPM/DDIM diffusion decoder
+└── run_phase3.py             # Orchestrator and command-line training harness
 ```
 
 ---
 
-### 🚀 Running Phase 3 Model Training
+## 📈 Phase 4: Quantitative Evaluation & Live Gradio Demo
 
-To retrain the Style-Conditioned I-JEPA model or run training with custom epochs:
+We evaluated the performance of our Style-Conditioned model on **887 held-out test images** using a 50% mask (exactly 98 target patches).
 
-1. **Run full training (15 epochs default)**:
-   ```powershell
-   $env:PYTHONIOENCODING='utf-8'; .\venv\Scripts\python.exe -u phase3\run_phase3.py --epochs 15
-   ```
-2. **Review intermediate reconstructions**:
-   Open `visualizations/reconstructions/` and inspect `epoch_15.png` to view the high-fidelity, style-guided restored paintings.
+### 1. End-to-End Metrics Comparison
 
-The complete **Historic Image Restoration** research codebase is now fully implemented, optimized, and verified across all phases, establishing a state-of-the-art hybrid framework for style-conditioned self-supervised art restoration. 🚀
+| Method | SSIM | PSNR (dB) | FID ⬇️ | Style Fidelity ⬆️ |
+| :--- | :---: | :---: | :---: | :---: |
+| **Conditioned I-JEPA (Ours)** | 0.6058 | **21.08** | **105.71** | **80.27%** |
+| **Vanilla I-JEPA** | 0.6030 | 20.99 | 106.89 | 79.03% |
+| **Classical Inpaint (OpenCV)** | **0.7090** | 19.59 | 149.86 | 63.02% |
+
+* **Conditioning Ablation:** No Conditioning (Vanilla) achieves 79.03% style fidelity; Color-Only achieves 79.82%; Texture-Only achieves 79.59%; and the **Full Hybrid Vector** achieves **80.27%**.
+
+### 2. Feature Standardization & Alignment Fix
+During evaluation, we fixed a critical mismatch in the Phase 4 evaluator. The style classifier (`style_predictor.pkl`) expects inputs normalized by block-specific standard scalers and SHAP scaling weights. We updated [evaluator.py](file:///c:/Users/SUBHAM/Downloads/Image%20restoration%20using%20JEPA/phase4/evaluator.py) to:
+1. Load `block_scalers.pkl` (for GLCM, LBP, Color, CNN blocks) and `shap_scaling_weights.npy` during startup.
+2. Apply block Z-score standardization and SHAP feature weighting to the extracted in-memory features before sending them to the SVM classifier.
+This restored the classifier's correct behavior, lifting the reported style fidelity from a flat 7.78% to a validated **80.27%**.
+
+### 3. Interactive 5-Mode Gradio Web Server
+We developed a complete interactive web interface under [gradio_app.py](file:///c:/Users/SUBHAM/Downloads/Image%20restoration%20using%20JEPA/phase4/gradio_app.py) containing five modes:
+* **Mode 1 (Browse Dataset):** Browse through pre-loaded dataset images by class.
+* **Mode 2 (Fixed Grid Masking):** Applies a configurable grid mask (e.g. 50%) and performs restoration.
+* **Mode 3 (Paint Corruption):** Draw custom brushstrokes directly on the artwork canvas to restore.
+* **Mode 4 (Upload Custom Image):** Upload any external artwork, draw a mask, and reconstruct it.
+* **Mode 5 (Compare Baselines):** Compare side-by-side results of Conditioned JEPA vs. Vanilla JEPA vs. OpenCV Telea.
+
+---
+
+### 📂 Phase 4 Directory Layout
+
+```
+phase4/
+├── config.py                 # Evaluation configurations and seeds
+├── evaluator.py              # Quantitative evaluation engine with scaling fixes
+├── gradio_app.py             # 5-mode interactive Gradio UI design
+└── run_phase4.py             # Master orchestrator for metrics and Gradio server
+```
+
+---
+
+## 🔍 Graphify Knowledge Graph Integration
+
+We integrated the **Graphify** tool to maintain an AST-based queryable knowledge graph of the codebase.
+
+* **Graph Composition:** 460 nodes, 629 edges, and 35 communities mapping modules, classes, functions, and imports.
+* **Interactive Visualization:** Open [graph.html](file:///c:/Users/SUBHAM/Downloads/Image%20restoration%20using%20JEPA/graphify-out/graph.html) in your browser to view a 2D network diagram.
+* **Collapsible D3 Tree:** Open [GRAPH_TREE.html](file:///c:/Users/SUBHAM/Downloads/Image%20restoration%20using%20JEPA/graphify-out/GRAPH_TREE.html) to navigate files hierarchically.
+* **Git Checkout/Commit Hooks:** Automated via `graphify hook install` to rebuild/update the graph in milliseconds on Git changes.
+* **IDE Agent Configuration:** Integrated rules inside `.agents/` allow AI assistants to query the graphify graph before addressing architecture questions.
+
+---
+
+## 🚀 How to Run the Project
+
+### 1. Launch the Gradio Web Demo
+```powershell
+.\venv\Scripts\python.exe -u phase4\run_phase4.py --demo
+```
+Access the server at **[http://localhost:7860](http://localhost:7860)**.
+
+### 2. Run the Quantitative Metrics Suite
+```powershell
+.\venv\Scripts\python.exe phase4\run_phase4.py --evaluate
+```
+
+### 3. Query the Graphify Code Graph
+```powershell
+.\venv\Scripts\graphify.exe query "Explain PixelDecoder"
+```
