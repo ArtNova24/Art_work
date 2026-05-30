@@ -22,6 +22,13 @@ def main():
     parser = argparse.ArgumentParser(description="Historic Image Restoration Phase 3 — Style-Conditioned I-JEPA Reconstruction Suite")
     parser.add_argument("--dry-run", action="store_true", help="Execute 2 training epochs over a mini-dataset for fast shape & gradient flow verification.")
     parser.add_argument("--epochs", type=int, default=None, help="Override default epoch count.")
+    parser.add_argument(
+        "--decoder-type",
+        type=str,
+        default=None,
+        choices=["mlp", "diffusion"],
+        help="Pixel decoder type: 'diffusion' (DDPM/DDIM, default) or 'mlp' (legacy convolutional decoder)."
+    )
     args = parser.parse_args()
 
     # On Windows, force UTF-8 encoding via environment variable.
@@ -47,7 +54,7 @@ def main():
         print(f"    Set seeds to {RANDOM_SEED} on CPU.")
 
     # 2. Trigger orchestrator training
-    run_training(dry_run=args.dry_run, num_epochs=args.epochs)
+    run_training(dry_run=args.dry_run, num_epochs=args.epochs, decoder_type=args.decoder_type)
 
     print("============================================================")
     if args.dry_run:

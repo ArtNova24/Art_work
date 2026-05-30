@@ -38,11 +38,17 @@ from phase1.extract_lbp import extract_lbp
 from phase1.extract_color import extract_color
 from phase1.extract_cnn import TRANSFORM as IMAGENET_TRANSFORM
 
-from phase3.config import DEVICE
-from phase3.masking import BlockMaskGenerator
-from phase3.models import (
-    StyleProjector, ViTContextEncoder, StyleConditionedPredictor, PixelDecoder
+from phase3.config import (
+    DEVICE,
+    DECODER_PATH, DECODER_DIFFUSION_PATH,
+    DDIM_SAMPLING_STEPS,
+    GUIDEPAINT_GAMMA, GUIDEPAINT_SAMPLING_STEPS, GUIDEPAINT_INTERRUPT_T,
 )
+from phase3.models import (
+    StyleProjector, ViTContextEncoder, StyleConditionedPredictor,
+    get_pixel_decoder,
+)
+from phase3.masking import BlockMaskGenerator
 from phase3.train_jepa import extract_patches, reconstruct_image
 
 import gradio as gr
@@ -52,27 +58,98 @@ import gradio as gr
 # ---------------------------------------------------------------------------
 print("  [Historic Image Restoration] Initializing model registry for Gradio demo...")
 
-_projector = StyleProjector().to(DEVICE)
-_projector.load_state_dict(torch.load(os.path.join(FEATURES_DIR, "jepa_style_projector.pt"), map_location=DEVICE))
-_projector.eval()
+os.makedirs(FEATURES_DIR, exist_ok=True)
 
-_context_encoder = ViTContextEncoder().to(DEVICE)
-_context_encoder.load_state_dict(torch.load(os.path.join(FEATURES_DIR, "jepa_context_encoder.pt"), map_location=DEVICE))
-_context_encoder.eval()
+class _FallbackScaler:
+    def transform(self, x):
+        return np.asarray(x, dtype=np.float32)
 
-_predictor = StyleConditionedPredictor().to(DEVICE)
-_predictor.load_state_dict(torch.load(os.path.join(FEATURES_DIR, "jepa_predictor.pt"), map_location=DEVICE))
-_predictor.eval()
+class _FallbackPCA:
+    def transform(self, x):
+        x = np.asarray(x, dtype=np.float32)
+        if x.ndim == 1:
+            x = x.reshape(1, -1)
+        out = np.zeros((x.shape[0], 512), dtype=np.float32)
+        take = min(x.shape[1], 512)
+        out[:, :take] = x[:, :take]
+        return out
 
-_pixel_decoder = PixelDecoder().to(DEVICE)
-_pixel_decoder.load_state_dict(torch.load(os.path.join(FEATURES_DIR, "jepa_pixel_decoder.pt"), map_location=DEVICE))
-_pixel_decoder.eval()
+class _FallbackClassifier:
+    def predict_proba(self, x):
+        x = np.asarray(x, dtype=np.float32)
+        return np.full((x.shape[0], len(ALL_CLASSES)), 1.0 / len(ALL_CLASSES), dtype=np.float32)
 
-_classifier = joblib.load(os.path.join(FEATURES_DIR, "style_predictor.pkl"))
-_pca_model  = joblib.load(os.path.join(FEATURES_DIR, "pca_model.pkl"))
-_scaler     = joblib.load(os.path.join(FEATURES_DIR, "cnn_scaler.pkl"))
+    def predict(self, x):
+        x = np.asarray(x, dtype=np.float32)
+        return np.zeros(x.shape[0], dtype=np.int64)
 
-_mask_gen   = BlockMaskGenerator(grid_size=14, target_masked=98)
+
+try:
+    _projector = StyleProjector().to(DEVICE)
+    _projector.load_state_dict(torch.load(os.path.join(FEATURES_DIR, "jepa_style_projector.pt"), map_location=DEVICE))
+    _projector.eval()
+except Exception as exc:
+    _projector = StyleProjector().to(DEVICE)
+    _projector.eval()
+    print("  [WARN] Falling back to random projector weights:", exc)
+
+try:
+    _context_encoder = ViTContextEncoder().to(DEVICE)
+    _context_encoder.load_state_dict(torch.load(os.path.join(FEATURES_DIR, "jepa_context_encoder.pt"), map_location=DEVICE))
+    _context_encoder.eval()
+except Exception as exc:
+    _context_encoder = ViTContextEncoder().to(DEVICE)
+    _context_encoder.eval()
+    print("  [WARN] Falling back to random context encoder:", exc)
+
+try:
+    _predictor = StyleConditionedPredictor().to(DEVICE)
+    _predictor.load_state_dict(torch.load(os.path.join(FEATURES_DIR, "jepa_predictor.pt"), map_location=DEVICE))
+    _predictor.eval()
+except Exception as exc:
+    _predictor = StyleConditionedPredictor().to(DEVICE)
+    _predictor.eval()
+    print("  [WARN] Falling back to random predictor:", exc)
+
+_pixel_decoder_ckpt = DECODER_DIFFUSION_PATH if os.path.exists(DECODER_DIFFUSION_PATH) else DECODER_PATH
+_use_diffusion_decoder = os.path.exists(DECODER_DIFFUSION_PATH)
+_dec_type = 'diffusion' if _use_diffusion_decoder else 'mlp'
+_decoder_loaded = False
+
+try:
+    _pixel_decoder = get_pixel_decoder(decoder_type=_dec_type, device=str(DEVICE)).to(DEVICE)
+    _pixel_decoder.load_state_dict(torch.load(_pixel_decoder_ckpt, map_location=DEVICE))
+    _pixel_decoder.eval()
+    _decoder_loaded = True
+    print(f"  [Historic Image Restoration] Pixel decoder: {_dec_type.upper()} loaded from {_pixel_decoder_ckpt}")
+except Exception as exc:
+    _pixel_decoder = get_pixel_decoder(decoder_type='diffusion', device=str(DEVICE)).to(DEVICE)
+    _pixel_decoder.eval()
+    _use_diffusion_decoder = True
+    _dec_type = 'diffusion'
+    _decoder_loaded = False
+    print("  [WARN] Falling back to random diffusion decoder:", exc)
+    print("  [WARN] No pretrained pixel decoder checkpoint found. The demo cannot produce high-quality reconstructions until you place a trained checkpoint in 'features/'.")
+
+try:
+    _classifier = joblib.load(os.path.join(FEATURES_DIR, "style_predictor.pkl"))
+except Exception as exc:
+    _classifier = _FallbackClassifier()
+    print("  [WARN] Falling back to dummy classifier:", exc)
+
+try:
+    _pca_model = joblib.load(os.path.join(FEATURES_DIR, "pca_model.pkl"))
+except Exception as exc:
+    _pca_model = _FallbackPCA()
+    print("  [WARN] Falling back to dummy PCA model:", exc)
+
+try:
+    _scaler = joblib.load(os.path.join(FEATURES_DIR, "cnn_scaler.pkl"))
+except Exception as exc:
+    _scaler = _FallbackScaler()
+    print("  [WARN] Falling back to dummy CNN scaler:", exc)
+
+_mask_gen = BlockMaskGenerator(grid_size=14, target_masked=98)
 
 # DINOv2 and ResNet-50 for feature extraction
 from extract_cnn import load_models as _load_cnn_models
@@ -177,14 +254,27 @@ def extract_hybrid(img_tensor_minus1_to_1):
 # ---------------------------------------------------------------------------
 # Core reconstruction function
 # ---------------------------------------------------------------------------
-def _reconstruct(img_tensor, style_vec_np, mask_1d, ablation=None):
+def _reconstruct(img_tensor, style_vec_np, mask_1d, ablation=None,
+                 sampling_mode='guided', seed=None, interrupt_t=None,
+                 gamma=None):
     """
-    img_tensor : (1, 3, 224, 224) on CPU, range [-1, 1]
-    style_vec_np: (989,) float32 numpy
-    mask_1d     : (196,) bool torch BoolTensor
-    ablation    : None | 'zeros' | 'color_only' | 'texture_only'
+    img_tensor    : (1, 3, 224, 224) on CPU, range [-1, 1]
+    style_vec_np  : (989,) float32 numpy
+    mask_1d       : (196,) bool BoolTensor
+    ablation      : None | 'zeros' | 'color_only' | 'texture_only'
+    sampling_mode : 'guided'      -- GuidePaint Algorithm 1 (default, best quality)
+                    'fast'        -- Standard DDIM, no gradient guidance (faster)
+                    'interrupted' -- GuidePaint Sec.4, stop at interrupt_t
+    seed          : int or None   -- For diverse outputs (GuidePaint Sec.3)
+    interrupt_t   : int or None   -- Interrupt timestep (GuidePaint Sec.4)
+    gamma         : float or None -- Override GUIDEPAINT_GAMMA from config
     Returns (3, 224, 224) float tensor on CPU, range [-1, 1].
     """
+    if not _decoder_loaded:
+        raise RuntimeError(
+            "No pretrained pixel decoder checkpoint is loaded. "
+            "Place a trained checkpoint in 'features/' and restart the demo."
+        )
     imgs   = img_tensor.to(DEVICE)
     masks  = mask_1d.unsqueeze(0).to(DEVICE)   # (1, 196)
     sv     = style_vec_np.copy()
@@ -198,6 +288,9 @@ def _reconstruct(img_tensor, style_vec_np, mask_1d, ablation=None):
 
     sv_t = torch.tensor(sv, dtype=torch.float32).unsqueeze(0).to(DEVICE)  # (1, 989)
 
+    _gamma = gamma if gamma is not None else GUIDEPAINT_GAMMA
+    _int_t = interrupt_t if interrupt_t is not None else GUIDEPAINT_INTERRUPT_T
+
     with torch.no_grad():
         patches = extract_patches(imgs)                            # (1, 196, 3, 16, 16)
         num_tgt = int(mask_1d.sum().item())
@@ -205,10 +298,39 @@ def _reconstruct(img_tensor, style_vec_np, mask_1d, ablation=None):
         tgt_idx    = sorted_idx[:, -num_tgt:] if num_tgt > 0 else sorted_idx[:, :0]
 
         s_emb      = _projector(sv_t)                              # (1, 256)
-        z_ctx, _   = _context_encoder(imgs, mask=masks)            
-        z_pred, _  = _predictor(z_ctx, s_emb, mask=masks)         
-        pix_pred   = _pixel_decoder(z_pred)                        
+        z_ctx, _   = _context_encoder(imgs, mask=masks)
+        z_pred, _  = _predictor(z_ctx, s_emb, mask=masks)
 
+    # Decoder dispatch (outside no_grad so GuidePaint can compute gradients)
+    if _use_diffusion_decoder:
+        if sampling_mode == 'interrupted':
+            # GuidePaint Sec.4: interrupted sampling removes unmarkable degradations
+            pix_pred = _pixel_decoder.interrupted_sample(
+                z_pred, s_emb,
+                ddim_steps=GUIDEPAINT_SAMPLING_STEPS,
+                gamma=_gamma,
+                interrupt_at_t=_int_t if _int_t is not None else 249,
+                seed=seed,
+            )
+        elif sampling_mode == 'fast':
+            # Standard DDIM — fastest, no gradient computation
+            with torch.no_grad():
+                pix_pred = _pixel_decoder.sample(
+                    z_pred, s_emb, ddim_steps=DDIM_SAMPLING_STEPS
+                )
+        else:
+            # Default: GuidePaint Algorithm 1 — lossless image-guided sampling
+            pix_pred = _pixel_decoder.sample_guided(
+                z_pred, s_emb,
+                ddim_steps=GUIDEPAINT_SAMPLING_STEPS,
+                gamma=_gamma,
+                seed=seed,
+            )
+    else:
+        with torch.no_grad():
+            pix_pred = _pixel_decoder(z_pred)
+
+    with torch.no_grad():
         recon_patches = patches.clone()
         if num_tgt > 0:
             recon_patches[0, tgt_idx[0]] = pix_pred[0]
@@ -364,11 +486,12 @@ def extract_pil_image(value):
 # ---------------------------------------------------------------------------
 # Main inference function called by Gradio
 # ---------------------------------------------------------------------------
-def run_inference(mode, img_mode1, editor_clean, editor_corrupted, show_metrics):
+def run_inference(mode, img_mode1, editor_clean, editor_corrupted, show_metrics,
+                  sampling_mode, seed, guidance_gamma, interrupt_t):
     """
     Gradio callback supporting 5 modes.
     """
-    print(f"\n[run_inference] Mode: {mode}")
+    print(f"\n[run_inference] Mode: {mode} | Sampler: {sampling_mode} | Seed: {seed} | gamma: {guidance_gamma:.3f}")
     try:
         layers = []
         # 1. Extract base image and drawing layers
@@ -557,8 +680,19 @@ def run_inference(mode, img_mode1, editor_clean, editor_corrupted, show_metrics)
         chart = _style_chart(probs, pred_idx, title="Input Artwork -- Style Classification")
 
         # 5. Run reconstructions
-        cond_t = _reconstruct(img_tensor, style_vec, mask_1d, ablation=None)
-        vanilla_t = _reconstruct(img_tensor, style_vec, mask_1d, ablation='zeros')
+        _seed   = int(seed) if seed is not None and seed >= 0 else None
+        _gamma  = float(guidance_gamma)
+        _int_t  = int(interrupt_t)
+        cond_t = _reconstruct(
+            img_tensor, style_vec, mask_1d, ablation=None,
+            sampling_mode=sampling_mode, seed=_seed,
+            gamma=_gamma, interrupt_t=_int_t,
+        )
+        vanilla_t = _reconstruct(
+            img_tensor, style_vec, mask_1d, ablation='zeros',
+            sampling_mode=sampling_mode, seed=_seed,
+            gamma=_gamma, interrupt_t=_int_t,
+        )
         opencv_pil = _opencv_inpaint(img_tensor, mask_1d)
 
         cond_pil = tensor_to_pil(cond_t)
@@ -814,6 +948,63 @@ def build_app():
                     label="📐 Show Reconstruction Metrics",
                     value=True
                 )
+
+                # ── GuidePaint Controls
+                if _use_diffusion_decoder:
+                    gr.Markdown("""---
+### 🎨 GuidePaint Sampling Controls
+*Based on Yu et al. 2025, npj Heritage Science*""")
+                    sampling_mode_radio = gr.Radio(
+                        choices=[
+                            ("🔬 Guided (GuidePaint Algo.1)",  "guided"),
+                            ("⚡ Fast DDIM (no guidance)",      "fast"),
+                            ("🧹 Interrupted (remove degradations)", "interrupted"),
+                        ],
+                        value="guided",
+                        label="Sampling Strategy",
+                        info="Guided = best quality. Interrupted = removes cracks/fading without a mask.",
+                    )
+                    with gr.Row():
+                        seed_input = gr.Number(
+                            label="🎲 Random Seed",
+                            value=-1,
+                            precision=0,
+                            info="-1 = random. Set a fixed value to reproduce or compare results (GuidePaint Sec.3).",
+                            scale=1,
+                        )
+                        gamma_slider = gr.Slider(
+                            minimum=0.001,
+                            maximum=0.5,
+                            step=0.001,
+                            value=GUIDEPAINT_GAMMA,
+                            label=f"γ Guidance Weight",
+                            info="Strength of pixel-space gradient correction [Eq.7]. Paper: 0.001 for full images.",
+                            scale=2,
+                        )
+                    interrupt_slider = gr.Slider(
+                        minimum=50,
+                        maximum=900,
+                        step=10,
+                        value=249,
+                        label="🛑 Interrupt Timestep (Interrupted mode only)",
+                        info="Stop reverse diffusion here and return x0_est. Lower = smoother/less detail [GuidePaint Sec.4].",
+                        visible=False,
+                    )
+                    # Show interrupt slider only when 'interrupted' mode is selected
+                    def _toggle_interrupt(mode):
+                        return gr.update(visible=(mode == "interrupted"))
+                    sampling_mode_radio.change(
+                        fn=_toggle_interrupt,
+                        inputs=[sampling_mode_radio],
+                        outputs=[interrupt_slider],
+                    )
+                else:
+                    # MLP decoder: no GuidePaint controls needed
+                    sampling_mode_radio = gr.Radio(choices=["fast"], value="fast", visible=False)
+                    seed_input          = gr.Number(value=-1, visible=False)
+                    gamma_slider        = gr.Slider(minimum=0.001, maximum=0.5, value=0.1, visible=False)
+                    interrupt_slider    = gr.Slider(minimum=50, maximum=900, value=249, visible=False)
+
                 run_btn = gr.Button("🔮  Reconstruct Painting", variant="primary")
 
                 # Container for Mode 1 Examples
@@ -878,7 +1069,10 @@ def build_app():
         # Wire controls
         run_btn.click(
             fn=run_inference,
-            inputs=[mode_selector, img_mode1, editor_clean, editor_corrupted, show_metrics_cb],
+            inputs=[
+                mode_selector, img_mode1, editor_clean, editor_corrupted, show_metrics_cb,
+                sampling_mode_radio, seed_input, gamma_slider, interrupt_slider,
+            ],
             outputs=[out_orig, out_corrupt, out_cond, out_vanilla, out_opencv, chart_out, metrics_md]
         )
 

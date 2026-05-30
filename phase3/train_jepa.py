@@ -1,7 +1,7 @@
 """
 Historic Image Restoration Phase 3 — Style-Conditioned I-JEPA Training Suite.
 Implements:
-  1. Loss orchestrations (Latent L2 + Pixel L2 joint optimization).
+  1. Loss orchestrations (Latent L2 + Diffusion noise-prediction joint optimization).
   2. Momentum-based target encoder tracking (EMA).
   3. Patch folding/unfolding diagnostic saves.
   4. Side-by-side restoration visualization generation.
@@ -22,12 +22,17 @@ from torchvision.utils import save_image
 from phase3.config import (
     DEVICE, BATCH_SIZE, EPOCHS, LR, WEIGHT_DECAY,
     EMA_MOMENTUM_BASE, EMA_MOMENTUM_MAX, LATENT_LOSS_WEIGHT, PIXEL_LOSS_WEIGHT,
-    PROJECTOR_PATH, ENCODER_PATH, PREDICTOR_PATH, DECODER_PATH, TARGET_ENCODER_PATH,
+    DIFFUSION_LOSS_WEIGHT, DECODER_TYPE,
+    DIFFUSION_TIMESTEPS, DIFFUSION_BETA_START, DIFFUSION_BETA_END, DDIM_SAMPLING_STEPS,
+    GUIDEPAINT_GAMMA, GUIDEPAINT_SAMPLING_STEPS, GUIDEPAINT_INTERRUPT_T,
+    PROJECTOR_PATH, ENCODER_PATH, PREDICTOR_PATH,
+    DECODER_PATH, DECODER_DIFFUSION_PATH, TARGET_ENCODER_PATH,
     RECON_DIR, VIT_EMBED_DIM
 )
 from phase3.masking import BlockMaskGenerator
 from phase3.models import (
-    StyleProjector, ViTContextEncoder, StyleConditionedPredictor, PixelDecoder
+    StyleProjector, ViTContextEncoder, StyleConditionedPredictor,
+    PixelDecoder, DiffusionPixelDecoder, get_pixel_decoder
 )
 from phase3.dataset import StyleJEPAImageDataset
 
@@ -121,10 +126,14 @@ def reconstruct_image(patches, patch_size=16):
     # Shape: (B, 3, 224, 224)
     return recon_img
 
-def run_training(dry_run=False, num_epochs=None):
+def run_training(dry_run=False, num_epochs=None, decoder_type=None):
     """
     Executes the self-supervised style-conditioned I-JEPA training run.
+    decoder_type: 'diffusion' | 'mlp' | None (uses DECODER_TYPE from config)
     """
+    # Resolve decoder type
+    _decoder_type = decoder_type if decoder_type is not None else DECODER_TYPE
+    _use_diffusion = (_decoder_type == 'diffusion')
     t_start = time.time()
     
     # 1. Datasets & Dataloaders
@@ -149,7 +158,16 @@ def run_training(dry_run=False, num_epochs=None):
     projector = StyleProjector().to(DEVICE)
     context_encoder = ViTContextEncoder().to(DEVICE)
     predictor = StyleConditionedPredictor().to(DEVICE)
-    pixel_decoder = PixelDecoder().to(DEVICE)
+    pixel_decoder = get_pixel_decoder(
+        decoder_type=_decoder_type,
+        latent_dim=VIT_EMBED_DIM,
+        style_dim=256,
+        num_timesteps=DIFFUSION_TIMESTEPS,
+        beta_start=DIFFUSION_BETA_START,
+        beta_end=DIFFUSION_BETA_END,
+        device=str(DEVICE),
+    ).to(DEVICE)
+    print(f"    Pixel decoder: {_decoder_type.upper()} ({type(pixel_decoder).__name__})", flush=True)
     
     # Initialize EMA Target Encoder
     target_encoder = ViTContextEncoder().to(DEVICE)
@@ -161,8 +179,8 @@ def run_training(dry_run=False, num_epochs=None):
         
     print(f"    Models loaded on device: {DEVICE}", flush=True)
 
-    # Initialize perceptual style loss helper
-    perceptual_loss_fn = PerceptualStyleLoss(device=DEVICE)
+    # Initialize perceptual style loss helper (used for MLP path only)
+    perceptual_loss_fn = PerceptualStyleLoss(device=DEVICE) if not _use_diffusion else None
 
     # 3. Optimizer & Schedulers
     # Differential learning rates for pretrained vs new components
@@ -195,9 +213,10 @@ def run_training(dry_run=False, num_epochs=None):
         pixel_decoder.train()
         target_encoder.eval()  # EMA target remains in evaluation mode
         
-        train_latent_loss_sum = 0.0
-        train_pixel_loss_sum = 0.0
-        train_loss_sum = 0.0
+        train_latent_loss_sum  = 0.0
+        train_diffusion_loss_sum = 0.0   # diffusion path
+        train_pixel_loss_sum   = 0.0    # mlp path
+        train_loss_sum         = 0.0
         
         for batch_idx, (imgs, style_vecs, _) in enumerate(train_loader):
             B = imgs.shape[0]
@@ -232,27 +251,31 @@ def run_training(dry_run=False, num_epochs=None):
             # --- 4. Forward pass Predictor (Predict Target latents conditioned on style)
             z_tgt_pred, _ = predictor(z_ctx, s_emb, mask=masks) # (B, 98, VIT_EMBED_DIM)
             
-            # --- 5. Forward pass Pixel Decoder
-            pixel_pred = pixel_decoder(z_tgt_pred) # (B, 98, 3, 16, 16)
-            
-            # Gather ground-truth pixel patches
+            # --- 5. Gather ground-truth pixel patches (always needed)
             pixel_gt = torch.gather(
                 img_patches, 1,
                 target_indices.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, 3, 16, 16)
             ) # (B, 98, 3, 16, 16)
-            
-            # Reconstruct predicted image for perceptual/style loss
-            recon_patches = img_patches.clone()
-            recon_patches[torch.arange(B).unsqueeze(-1), target_indices] = pixel_pred
-            pred_img = reconstruct_image(recon_patches)  # (B, 3, 224, 224)
-            
-            # --- 6. Loss calculation
+
+            # --- 6. Loss calculation (decoder-type branching)
             latent_loss = F.mse_loss(z_tgt_pred, z_target_gt.detach())
-            mse_loss = F.mse_loss(pixel_pred, pixel_gt)
-            perc_loss, style_gram_loss = perceptual_loss_fn(pred_img, imgs)
-            
-            pixel_loss = 0.5 * mse_loss + 0.3 * perc_loss + 0.2 * style_gram_loss
-            loss = LATENT_LOSS_WEIGHT * latent_loss + PIXEL_LOSS_WEIGHT * pixel_loss
+
+            if _use_diffusion:
+                # DIFFUSION PATH: compute DDPM noise-prediction loss
+                # compute_loss() internally samples a random timestep t
+                diffusion_loss = pixel_decoder.compute_loss(z_tgt_pred, pixel_gt, s_emb)
+                loss = LATENT_LOSS_WEIGHT * latent_loss + DIFFUSION_LOSS_WEIGHT * diffusion_loss
+                pixel_loss = diffusion_loss  # for unified logging
+            else:
+                # MLP PATH: simple pixel reconstruction + perceptual loss
+                pixel_pred = pixel_decoder(z_tgt_pred)  # (B, 98, 3, 16, 16)
+                recon_patches = img_patches.clone()
+                recon_patches[torch.arange(B).unsqueeze(-1), target_indices] = pixel_pred
+                pred_img = reconstruct_image(recon_patches)  # (B, 3, 224, 224)
+                mse_loss = F.mse_loss(pixel_pred, pixel_gt)
+                perc_loss, style_gram_loss = perceptual_loss_fn(pred_img, imgs)
+                pixel_loss = 0.5 * mse_loss + 0.3 * perc_loss + 0.2 * style_gram_loss
+                loss = LATENT_LOSS_WEIGHT * latent_loss + PIXEL_LOSS_WEIGHT * pixel_loss
             
             # --- 7. Backprop & step
             optimizer.zero_grad()
@@ -269,8 +292,10 @@ def run_training(dry_run=False, num_epochs=None):
                     param_k.data = ema_momentum * param_k.data + (1.0 - ema_momentum) * param_q.data
             
             # Record losses
-            train_latent_loss_sum += latent_loss.item() * B
-            train_pixel_loss_sum += pixel_loss.item() * B
+            train_latent_loss_sum  += latent_loss.item() * B
+            train_pixel_loss_sum   += pixel_loss.item() * B
+            if _use_diffusion:
+                train_diffusion_loss_sum += pixel_loss.item() * B
             train_loss_sum += loss.item() * B
             
             if dry_run and batch_idx >= 2:
@@ -316,24 +341,37 @@ def run_training(dry_run=False, num_epochs=None):
                 val_s_emb = projector(val_style_vecs)
                 val_z_ctx, _ = context_encoder(val_imgs, mask=val_masks)
                 val_z_tgt_pred, _ = predictor(val_z_ctx, val_s_emb, mask=val_masks)
-                
-                val_pixel_pred = pixel_decoder(val_z_tgt_pred)
+
                 val_pixel_gt = torch.gather(
                     val_img_patches, 1,
                     val_target_idx.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, 3, 16, 16)
                 )
-                
-                # Reconstruct validation prediction for compound loss
-                val_recon_patches = val_img_patches.clone()
-                val_recon_patches[torch.arange(B_val).unsqueeze(-1), val_target_idx] = val_pixel_pred
-                val_pred_img = reconstruct_image(val_recon_patches)
-                
-                # Losses
+
                 val_latent_l = F.mse_loss(val_z_tgt_pred, val_z_tgt_gt)
-                val_mse_l = F.mse_loss(val_pixel_pred, val_pixel_gt)
-                val_perc_l, val_style_l = perceptual_loss_fn(val_pred_img, val_imgs)
-                val_pixel_l = 0.5 * val_mse_l + 0.3 * val_perc_l + 0.2 * val_style_l
-                val_loss = LATENT_LOSS_WEIGHT * val_latent_l + PIXEL_LOSS_WEIGHT * val_pixel_l
+
+                if _use_diffusion:
+                    # GuidePaint guided sampling for pixel reconstruction visualization
+                    # Uses sample_guided() to match inference behaviour exactly.
+                    # compute_loss() gives the val noise-prediction MSE (no grad needed).
+                    val_pixel_pred = pixel_decoder.sample_with_mode(
+                        val_z_tgt_pred, val_s_emb,
+                        ddim_steps=GUIDEPAINT_SAMPLING_STEPS,
+                        mode='guided',
+                        gamma=GUIDEPAINT_GAMMA,
+                        interrupt_at_t=GUIDEPAINT_INTERRUPT_T,
+                    )
+                    val_diff_l = pixel_decoder.compute_loss(val_z_tgt_pred, val_pixel_gt, val_s_emb)
+                    val_pixel_l = val_diff_l
+                    val_loss = LATENT_LOSS_WEIGHT * val_latent_l + DIFFUSION_LOSS_WEIGHT * val_diff_l
+                else:
+                    val_pixel_pred = pixel_decoder(val_z_tgt_pred)
+                    val_recon_patches = val_img_patches.clone()
+                    val_recon_patches[torch.arange(B_val).unsqueeze(-1), val_target_idx] = val_pixel_pred
+                    val_pred_img = reconstruct_image(val_recon_patches)
+                    val_mse_l = F.mse_loss(val_pixel_pred, val_pixel_gt)
+                    val_perc_l, val_style_l = perceptual_loss_fn(val_pred_img, val_imgs)
+                    val_pixel_l = 0.5 * val_mse_l + 0.3 * val_perc_l + 0.2 * val_style_l
+                    val_loss = LATENT_LOSS_WEIGHT * val_latent_l + PIXEL_LOSS_WEIGHT * val_pixel_l
                 
                 val_loss_sum += val_loss.item() * B_val
                 val_samples += B_val
@@ -384,19 +422,22 @@ def run_training(dry_run=False, num_epochs=None):
         # Save checkpoints if Val loss improves
         if not dry_run and epoch_val_loss < best_val_loss:
             best_val_loss = epoch_val_loss
+            decoder_ckpt_path = DECODER_DIFFUSION_PATH if _use_diffusion else DECODER_PATH
             torch.save(projector.state_dict(), PROJECTOR_PATH)
             torch.save(context_encoder.state_dict(), ENCODER_PATH)
             torch.save(predictor.state_dict(), PREDICTOR_PATH)
-            torch.save(pixel_decoder.state_dict(), DECODER_PATH)
+            torch.save(pixel_decoder.state_dict(), decoder_ckpt_path)
             torch.save(target_encoder.state_dict(), TARGET_ENCODER_PATH)
-            print("      [CHECKPOINT] Saved best models.", flush=True)
-            
+            print(f"      [CHECKPOINT] Saved best models (decoder -> {decoder_ckpt_path}).", flush=True)
+
     print(f"\n  Style-Conditioned I-JEPA Model Training successfully concluded in {(time.time()-t_start)/60.0:.1f} minutes.")
     if not dry_run:
+        decoder_ckpt_path = DECODER_DIFFUSION_PATH if _use_diffusion else DECODER_PATH
         print(f"    Best Validation Loss: {best_val_loss:.5f}")
+        print(f"    Decoder type: {_decoder_type.upper()}")
         print(f"    Saved models in features/:")
         print(f"      - {PROJECTOR_PATH}")
         print(f"      - {ENCODER_PATH}")
         print(f"      - {PREDICTOR_PATH}")
-        print(f"      - {DECODER_PATH}")
+        print(f"      - {decoder_ckpt_path}")
         print(f"      - {TARGET_ENCODER_PATH}")

@@ -45,11 +45,15 @@ from phase1.extract_lbp import extract_lbp
 from phase1.extract_color import extract_color
 from phase1.extract_cnn import TRANSFORM as IMAGENET_TRANSFORM
 
-from phase3.config import DEVICE, RECON_DIR
+from phase3.config import (
+    DEVICE, RECON_DIR, DECODER_TYPE, DECODER_PATH, DECODER_DIFFUSION_PATH,
+    DDIM_SAMPLING_STEPS, GUIDEPAINT_GAMMA, GUIDEPAINT_SAMPLING_STEPS, GUIDEPAINT_INTERRUPT_T
+)
 from phase3.dataset import StyleJEPAImageDataset
 from phase3.masking import BlockMaskGenerator
 from phase3.models import (
-    StyleProjector, ViTContextEncoder, StyleConditionedPredictor, PixelDecoder
+    StyleProjector, ViTContextEncoder, StyleConditionedPredictor,
+    PixelDecoder, DiffusionPixelDecoder, get_pixel_decoder
 )
 from phase3.train_jepa import extract_patches, reconstruct_image
 
@@ -121,14 +125,29 @@ class Phase4Evaluator:
         self.projector = StyleProjector().to(self.device)
         self.context_encoder = ViTContextEncoder().to(self.device)
         self.predictor = StyleConditionedPredictor().to(self.device)
-        self.pixel_decoder = PixelDecoder().to(self.device)
-        
+
+        # Prefer diffusion decoder checkpoint; fall back to legacy MLP decoder
+        if os.path.exists(DECODER_DIFFUSION_PATH):
+            _dec_type = 'diffusion'
+            _dec_path = DECODER_DIFFUSION_PATH
+        else:
+            _dec_type = 'mlp'
+            _dec_path = DECODER_PATH
+            print("    [INFO] Diffusion decoder checkpoint not found; loading legacy MLP decoder.", flush=True)
+
+        self.pixel_decoder = get_pixel_decoder(
+            decoder_type=_dec_type,
+            device=str(self.device),
+        ).to(self.device)
+        self._use_diffusion = (_dec_type == 'diffusion')
+        print(f"    Decoder: {_dec_type.upper()} (checkpoint: {_dec_path})", flush=True)
+
         # Load pre-trained state dicts
         self.projector.load_state_dict(torch.load(os.path.join(FEATURES_DIR, "jepa_style_projector.pt"), map_location=self.device))
         self.context_encoder.load_state_dict(torch.load(os.path.join(FEATURES_DIR, "jepa_context_encoder.pt"), map_location=self.device))
         self.predictor.load_state_dict(torch.load(os.path.join(FEATURES_DIR, "jepa_predictor.pt"), map_location=self.device))
-        self.pixel_decoder.load_state_dict(torch.load(os.path.join(FEATURES_DIR, "jepa_pixel_decoder.pt"), map_location=self.device))
-        
+        self.pixel_decoder.load_state_dict(torch.load(_dec_path, map_location=self.device))
+
         self.projector.eval()
         self.context_encoder.eval()
         self.predictor.eval()
@@ -325,17 +344,31 @@ class Phase4Evaluator:
             img_patches = extract_patches(imgs)
             sorted_indices = torch.argsort(masks.to(torch.int32), dim=1)
             target_indices = sorted_indices[:, 98:]
-            
+
             s_emb = self.projector(style_vecs_mod_tensor)
             z_ctx, _ = self.context_encoder(imgs, mask=masks)
             z_tgt_pred, _ = self.predictor(z_ctx, s_emb, mask=masks)
+
+        # Decoder dispatch:
+        #   Diffusion path -> GuidePaint sample_guided() [Algorithm 1, Yu et al. 2025]
+        #   MLP path       -> direct forward pass
+        if self._use_diffusion:
+            pixel_pred = self.pixel_decoder.sample_with_mode(
+                z_tgt_pred, s_emb,
+                ddim_steps=GUIDEPAINT_SAMPLING_STEPS,
+                mode='guided',
+                gamma=GUIDEPAINT_GAMMA,
+                interrupt_at_t=GUIDEPAINT_INTERRUPT_T,
+            )
+        else:
             pixel_pred = self.pixel_decoder(z_tgt_pred)
-            
-            # Stitch back into full reconstructed images
+
+        # Stitch back into full reconstructed images
+        with torch.no_grad():
             recon_patches = img_patches.clone()
             recon_patches[torch.arange(B).unsqueeze(-1), target_indices] = pixel_pred
             recon_imgs = reconstruct_image(recon_patches)
-            
+
         return recon_imgs
 
     def run_classical_inpaint(self, imgs, masks):

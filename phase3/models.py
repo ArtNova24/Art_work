@@ -5,12 +5,16 @@ Implements:
   2. Attention & TransformerBlock: Pure PyTorch implementation of Vit blocks.
   3. ViTContextEncoder: Context encoder (processes unmasked patches).
   4. StyleConditionedPredictor: Predictor decoder (conditioned on style embedding).
-  5. PixelDecoder: Lightweight convolutional / MLP reconstruction decoder.
+  5. MLPPixelDecoder: Legacy convolutional / MLP reconstruction decoder.
+  6. DiffusionPixelDecoder: Patch-level conditional diffusion decoder (DDPM + DDIM).
+  7. get_pixel_decoder(): Factory that returns the correct decoder by type string.
 All prints and comments are kept strictly in ASCII.
 """
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from phase3.diffusion_decoder import DiffusionPatchDecoder, DDPM
 
 # -- Style Embedding Projector
 class StyleProjector(nn.Module):
@@ -243,12 +247,13 @@ class StyleConditionedPredictor(nn.Module):
         return z_tgt_pred, target_indices
 
 
-# -- Convolutional Pixel Decoder
-class PixelDecoder(nn.Module):
+# -- Legacy Convolutional Pixel Decoder (renamed from PixelDecoder)
+class MLPPixelDecoder(nn.Module):
     """
-    Convolutional pixel decoder.
+    Legacy convolutional pixel decoder.
     Input : (B, N_tgt, embed_dim) latent predictions
     Output: (B, N_tgt, 3, 16, 16) pixel patches in [-1, 1]
+    Retained for backward compatibility with existing checkpoints.
     """
     def __init__(self, embed_dim=768, patch_size=16, channels=3):
         super().__init__()
@@ -299,3 +304,333 @@ class PixelDecoder(nn.Module):
         x = x.reshape(B, N_tgt, self.channels,
                        self.patch_size, self.patch_size)
         return x
+
+
+# Backward-compat alias so older checkpoints and imports using 'PixelDecoder' still work
+PixelDecoder = MLPPixelDecoder
+
+
+# -- Diffusion Pixel Decoder (patch-level DDPM / DDIM)
+class DiffusionPixelDecoder(nn.Module):
+    """
+    High-level wrapper around DiffusionPatchDecoder + DDPM noise scheduler.
+
+    Training mode  : compute_loss(z_tgt_pred, pixel_gt, s_emb)
+                     -> MSE between predicted and actual noise (L_diffusion)
+    Inference mode : sample(z_tgt_pred, s_emb, ddim_steps)
+                     -> pixel patches (B, N_tgt, 3, 16, 16)
+
+    Interface contract (identical to MLPPixelDecoder for drop-in replacement):
+      Input : z_tgt_pred (B, N_tgt, latent_dim)  predicted latents from predictor
+              s_emb      (B, style_dim)           projected style embedding
+    """
+    def __init__(self,
+                 latent_dim=768,
+                 style_dim=256,
+                 channels=3,
+                 patch_size=16,
+                 time_emb_dim=128,
+                 num_timesteps=1000,
+                 beta_start=0.0001,
+                 beta_end=0.02,
+                 device='cpu'):
+        super().__init__()
+        self.latent_dim  = latent_dim
+        self.style_dim   = style_dim
+        self.channels    = channels
+        self.patch_size  = patch_size
+        self.num_timesteps = num_timesteps
+        self._device     = device
+
+        # Core denoising U-Net (also contains GuidePaint latent_to_pixel head)
+        self.denoiser = DiffusionPatchDecoder(
+            latent_dim=latent_dim,
+            style_dim=style_dim,
+            channels=channels,
+            patch_size=patch_size,
+            time_emb_dim=time_emb_dim,
+        )
+
+        # DDPM noise scheduler (plain object, not nn.Module)
+        # Store beta params so they survive device moves in to()
+        self._beta_start = beta_start
+        self._beta_end   = beta_end
+        self.ddpm = DDPM(
+            num_timesteps=num_timesteps,
+            beta_start=beta_start,
+            beta_end=beta_end,
+            device=device,
+        )
+
+    # ------------------------------------------------------------------
+    # Called once the module is moved to a device so ddpm buffers follow
+    # ------------------------------------------------------------------
+    def to(self, *args, **kwargs):
+        result = super().to(*args, **kwargs)
+        # Re-initialise DDPM scheduler so its alpha/beta buffers live on the new device.
+        try:
+            if args:
+                dev = torch.device(args[0]) if not isinstance(args[0], torch.device) else args[0]
+                result.ddpm = DDPM(
+                    num_timesteps=result.num_timesteps,
+                    beta_start=result._beta_start,
+                    beta_end=result._beta_end,
+                    device=dev,
+                )
+                result._device = dev
+        except Exception:
+            pass
+        return result
+
+    # ------------------------------------------------------------------
+    # TRAINING: diffusion noise-prediction loss
+    # ------------------------------------------------------------------
+    def compute_loss(self, z_tgt_pred, pixel_gt, s_emb):
+        """
+        Computes DDPM noise-prediction MSE loss over a random diffusion timestep.
+
+        Args:
+            z_tgt_pred : (B, N_tgt, latent_dim)  predictor output
+            pixel_gt   : (B, N_tgt, 3, 16, 16)   ground-truth pixel patches in [-1,1]
+            s_emb      : (B, style_dim)           projected style embedding
+
+        Returns:
+            loss : scalar Tensor (MSE between predicted noise and actual noise)
+        """
+        B, N_tgt, C, H, W = pixel_gt.shape
+        BN = B * N_tgt
+        device = pixel_gt.device
+
+        # Flatten patch dimension into batch for conv processing
+        x0     = pixel_gt.reshape(BN, C, H, W)              # (BN, 3, 16, 16)
+        z_flat = z_tgt_pred.reshape(BN, self.latent_dim)    # (BN, latent_dim)
+
+        # Expand style embedding to match patch-batch dimension
+        # s_emb: (B, style_dim) -> (BN, style_dim)
+        s_flat = s_emb.unsqueeze(1).expand(-1, N_tgt, -1).reshape(BN, self.style_dim)
+
+        # Sample random timesteps uniformly for each patch
+        t = torch.randint(0, self.num_timesteps, (BN,), device=device)
+
+        # Add noise according to DDPM schedule
+        x_noisy, noise = self.ddpm.add_noise(x0, t)
+
+        # Predict noise with the denoising U-Net
+        pred_noise = self.denoiser(x_noisy, t, z_flat, s_flat)
+
+        return F.mse_loss(pred_noise, noise)
+
+    # ------------------------------------------------------------------
+    # INFERENCE MODE A: Standard DDIM fast sampling (no guidance)
+    # ------------------------------------------------------------------
+    @torch.no_grad()
+    def sample(self, z_tgt_pred, s_emb, ddim_steps=50):
+        """
+        Generates pixel patches via fast DDIM reverse diffusion (no GuidePaint guidance).
+        Use this for speed-critical paths. For higher-quality restoration, prefer
+        sample_guided() which applies GuidePaint's gradient-corrected reverse process.
+
+        Args:
+            z_tgt_pred : (B, N_tgt, latent_dim)
+            s_emb      : (B, style_dim)
+            ddim_steps : int  number of denoising steps
+
+        Returns:
+            pixel_pred : (B, N_tgt, 3, 16, 16)  in [-1, 1]
+        """
+        B, N_tgt, _ = z_tgt_pred.shape
+        BN = B * N_tgt
+        device = z_tgt_pred.device
+
+        z_flat = z_tgt_pred.reshape(BN, self.latent_dim)
+        s_flat = s_emb.unsqueeze(1).expand(-1, N_tgt, -1).reshape(BN, self.style_dim)
+        shape  = (BN, self.channels, self.patch_size, self.patch_size)
+
+        pixels_flat = self.ddpm.sample(
+            model=self.denoiser, z_tgt=z_flat, s_emb=s_flat,
+            shape=shape, device=device, num_steps=ddim_steps,
+        )  # (BN, 3, 16, 16)
+
+        return pixels_flat.reshape(B, N_tgt, self.channels,
+                                   self.patch_size, self.patch_size)
+
+    # ------------------------------------------------------------------
+    # INFERENCE MODE B: GuidePaint lossless image-guided sampling
+    # ------------------------------------------------------------------
+    def sample_guided(self, z_tgt_pred, s_emb, ddim_steps=50,
+                      gamma=0.1, seed=None):
+        """
+        GuidePaint lossless image-guided sampling (Algorithm 1, Yu et al. 2025).
+
+        At each reverse step:
+          1. Estimates x_0 from current x_t and predicted noise         [Eq.8]
+          2. Measures pixel-space similarity F(x_t, y, t) to y_ref      [Eq.9]
+             where y_ref = denoiser.get_pixel_reference(z_tgt) is the
+             latent-derived pixel reference (lossless — no VGG encoder).
+          3. Uses grad_{x_t}F to steer the reverse mean toward pixel-    [Eq.7]
+             consistent solutions.
+          4. Applies the lossless final step x = (1-m)*y + m*x0_est.    [Line9]
+
+        Args:
+            z_tgt_pred : (B, N_tgt, latent_dim)  I-JEPA predictor output
+            s_emb      : (B, style_dim)           projected style embedding
+            ddim_steps : int    number of reverse diffusion steps
+            gamma      : float  guidance weight (paper used 0.001 for full images;
+                                0.05-0.2 recommended for patch-level system)
+            seed       : int or None  random seed for diverse outputs [GuidePaint Sec.3]
+
+        Returns:
+            pixel_pred : (B, N_tgt, 3, 16, 16)  restored patches in [-1, 1]
+        """
+        B, N_tgt, _ = z_tgt_pred.shape
+        BN = B * N_tgt
+        device = z_tgt_pred.device
+
+        z_flat = z_tgt_pred.reshape(BN, self.latent_dim)
+        s_flat = s_emb.unsqueeze(1).expand(-1, N_tgt, -1).reshape(BN, self.style_dim)
+        shape  = (BN, self.channels, self.patch_size, self.patch_size)
+
+        pixels_flat = self.ddpm.sample_guided(
+            model=self.denoiser, z_tgt=z_flat, s_emb=s_flat,
+            shape=shape, device=device, num_steps=ddim_steps,
+            gamma=gamma, interrupt_at_t=None, seed=seed,
+        )  # (BN, 3, 16, 16)
+
+        return pixels_flat.reshape(B, N_tgt, self.channels,
+                                   self.patch_size, self.patch_size)
+
+    # ------------------------------------------------------------------
+    # INFERENCE MODE C: Interrupted sampling (GuidePaint Sec.4)
+    # ------------------------------------------------------------------
+    def interrupted_sample(self, z_tgt_pred, s_emb, ddim_steps=50,
+                           gamma=0.1, interrupt_at_t=249, seed=None):
+        """
+        GuidePaint interrupted sampling strategy (Yu et al. 2025, Sec.4).
+
+        Stops the reverse diffusion at an intermediate timestep t_stop and
+        returns the x_0_estimate directly. This discards the fine local details
+        that were recovered in the later steps, which — for degraded images —
+        correspond to the degradation patterns themselves (cracks, fading, etc.).
+
+        Produces smoother, cleaner results with fewer irrelevant degradation
+        details. Requires NO mask — the interruption handles unmarkable degradations.
+
+        Args:
+            z_tgt_pred    : (B, N_tgt, latent_dim)
+            s_emb         : (B, style_dim)
+            ddim_steps    : int   total reverse steps
+            gamma         : float guidance weight
+            interrupt_at_t: int   stop timestep (paper used 249 out of 1000 steps)
+                                  Lower = more aggressive smoothing.
+            seed          : int or None
+
+        Returns:
+            pixel_pred : (B, N_tgt, 3, 16, 16)  in [-1, 1]
+        """
+        B, N_tgt, _ = z_tgt_pred.shape
+        BN = B * N_tgt
+        device = z_tgt_pred.device
+
+        z_flat = z_tgt_pred.reshape(BN, self.latent_dim)
+        s_flat = s_emb.unsqueeze(1).expand(-1, N_tgt, -1).reshape(BN, self.style_dim)
+        shape  = (BN, self.channels, self.patch_size, self.patch_size)
+
+        pixels_flat = self.ddpm.sample_guided(
+            model=self.denoiser, z_tgt=z_flat, s_emb=s_flat,
+            shape=shape, device=device, num_steps=ddim_steps,
+            gamma=gamma, interrupt_at_t=interrupt_at_t, seed=seed,
+        )  # (BN, 3, 16, 16)
+
+        return pixels_flat.reshape(B, N_tgt, self.channels,
+                                   self.patch_size, self.patch_size)
+
+    # ------------------------------------------------------------------
+    # Unified sampling entry point for guided / interrupted / fast modes
+    # ------------------------------------------------------------------
+    def sample_with_mode(self, z_tgt_pred, s_emb, ddim_steps=50,
+                         mode='guided', gamma=0.1,
+                         interrupt_at_t=None, seed=None):
+        """
+        Dispatches to the appropriate diffusion sampling mode.
+
+        mode='guided'      -> GuidePaint Algorithm 1 (default, best quality)
+        mode='interrupted' -> GuidePaint interrupted sampling (Sec.4)
+        mode='fast'        -> Standard DDIM sampling (speed-only)
+        """
+        mode = (mode or 'guided').lower()
+
+        if mode == 'guided':
+            return self.sample_guided(
+                z_tgt_pred, s_emb,
+                ddim_steps=ddim_steps,
+                gamma=gamma,
+                seed=seed,
+            )
+        if mode == 'interrupted':
+            return self.interrupted_sample(
+                z_tgt_pred, s_emb,
+                ddim_steps=ddim_steps,
+                gamma=gamma,
+                interrupt_at_t=interrupt_at_t,
+                seed=seed,
+            )
+        if mode == 'fast':
+            return self.sample(z_tgt_pred, s_emb, ddim_steps=ddim_steps)
+
+        raise ValueError("Unknown sampling mode. Choose 'guided', 'interrupted', or 'fast'.")
+
+    # ------------------------------------------------------------------
+    # Convenience forward: dispatches to sample_guided() by default
+    # ------------------------------------------------------------------
+    def forward(self, z_tgt_pred, s_emb=None, ddim_steps=50):
+        """
+        Thin wrapper so DiffusionPixelDecoder can be called like the
+        legacy MLPPixelDecoder in eval/inference contexts.
+        Dispatches to sample_guided() — the GuidePaint-powered path.
+        Requires s_emb; raises ValueError if not provided.
+        """
+        if s_emb is None:
+            raise ValueError(
+                "DiffusionPixelDecoder.forward() requires s_emb (style embedding). "
+                "Pass s_emb=style_embedding or call .sample_guided() / .sample() directly."
+            )
+        return self.sample_guided(z_tgt_pred, s_emb, ddim_steps=ddim_steps)
+
+
+# -- Decoder Factory
+def get_pixel_decoder(decoder_type='diffusion',
+                      latent_dim=768,
+                      style_dim=256,
+                      num_timesteps=1000,
+                      beta_start=0.0001,
+                      beta_end=0.02,
+                      device='cpu'):
+    """
+    Factory function that returns the appropriate pixel decoder.
+
+    Args:
+        decoder_type  : 'diffusion' -> DiffusionPixelDecoder (default)
+                        'mlp'       -> MLPPixelDecoder (legacy)
+        latent_dim    : dimensionality of the I-JEPA predictor output (default 768)
+        style_dim     : dimensionality of the style embedding (default 256)
+        num_timesteps : DDPM timesteps (only used for 'diffusion')
+        beta_start    : DDPM beta start (only used for 'diffusion')
+        beta_end      : DDPM beta end   (only used for 'diffusion')
+        device        : torch device string (only used for 'diffusion')
+
+    Returns:
+        nn.Module instance (not yet moved to device)
+    """
+    if decoder_type == 'diffusion':
+        return DiffusionPixelDecoder(
+            latent_dim=latent_dim,
+            style_dim=style_dim,
+            num_timesteps=num_timesteps,
+            beta_start=beta_start,
+            beta_end=beta_end,
+            device=device,
+        )
+    elif decoder_type == 'mlp':
+        return MLPPixelDecoder(embed_dim=latent_dim)
+    else:
+        raise ValueError(f"Unknown decoder_type '{decoder_type}'. Choose 'diffusion' or 'mlp'.")
