@@ -141,7 +141,20 @@ class Phase4Evaluator:
         if not os.path.exists(self.classifier_path):
             raise FileNotFoundError(f"Style predictor classifier {self.classifier_path} not found! Please run Phase 2 first.")
         self.classifier = joblib.load(self.classifier_path)
+        
+        # Load block scalers and SHAP scaling weights to scale extracted features correctly
+        scalers_path = os.path.join(FEATURES_DIR, "block_scalers.pkl")
+        weights_path = os.path.join(FEATURES_DIR, "shap_scaling_weights.npy")
+        if os.path.exists(scalers_path) and os.path.exists(weights_path):
+            self.block_scalers = joblib.load(scalers_path)
+            self.shap_weights = np.load(weights_path)
+            print(f"    [SUCCESS] Loaded block scalers and SHAP scaling weights.")
+        else:
+            self.block_scalers = None
+            self.shap_weights = None
+            print(f"    [WARNING] block_scalers.pkl or shap_scaling_weights.npy not found!")
         print(f"    [SUCCESS] Loaded style classifier oracle from features/style_predictor.pkl.")
+
 
         # 3. Load Phase 1 DINOv2 & ResNet-50 models for in-memory CNN features
         print("  Initializing DINOv2 and ResNet-50 for feature extraction...", flush=True)
@@ -271,7 +284,19 @@ class Phase4Evaluator:
         # Assemble hybrid
         hybrid_vec = np.concatenate([glcm_feats, lbp_feats, color_feats, cnn_feats]).astype(np.float32)
         assert len(hybrid_vec) == TOTAL_DIM, f"Hybrid dimension mismatch: {len(hybrid_vec)} ≠ {TOTAL_DIM}"
+        
+        # Apply block Z-score standardization and SHAP scaling weights if available
+        if getattr(self, 'block_scalers', None) is not None and getattr(self, 'shap_weights', None) is not None:
+            glcm_norm = self.block_scalers["GLCM"].transform(hybrid_vec[0:20].reshape(1, -1))[0]
+            lbp_norm = self.block_scalers["LBP"].transform(hybrid_vec[20:276].reshape(1, -1))[0]
+            color_norm = self.block_scalers["Color"].transform(hybrid_vec[276:477].reshape(1, -1))[0]
+            cnn_norm = self.block_scalers["CNN"].transform(hybrid_vec[477:989].reshape(1, -1))[0]
+            
+            hybrid_norm = np.concatenate([glcm_norm, lbp_norm, color_norm, cnn_norm]).astype(np.float32)
+            hybrid_vec = hybrid_norm * self.shap_weights
+            
         return hybrid_vec
+
 
     def run_reconstruction(self, imgs, style_vecs, masks, ablation_mode=None):
         """

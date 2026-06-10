@@ -73,12 +73,27 @@ class StyleJEPAImageDataset(Dataset):
         if transform is not None:
             self.transform = transform
         else:
-            # Reconstruct and normalize images strictly to range [-1, 1] using Tanh-friendly scaling
-            self.transform = transforms.Compose([
-                transforms.Resize((IMG_SIZE, IMG_SIZE)),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-            ])
+            if self.split == 'train':
+                # Use stronger augmentation for training to prevent overfitting
+                self.transform = transforms.Compose([
+                    transforms.Resize((256, 256)),
+                    transforms.RandomCrop((IMG_SIZE, IMG_SIZE)),
+                    transforms.RandomHorizontalFlip(p=0.5),
+                    transforms.ColorJitter(
+                        brightness=0.2, contrast=0.2,
+                        saturation=0.2, hue=0.05
+                    ),
+                    transforms.RandomRotation(10),
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+                ])
+            else:
+                # Reconstruct and normalize images strictly to range [-1, 1] using Tanh-friendly scaling
+                self.transform = transforms.Compose([
+                    transforms.Resize((IMG_SIZE, IMG_SIZE)),
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+                ])
 
     def __len__(self):
         return len(self.features)

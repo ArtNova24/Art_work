@@ -9,18 +9,18 @@ Masking Ratio: Fixed 50% (exactly 98 target patches)
 ------------------------------------------------------------
   Method             | SSIM   | PSNR (dB) | FID     | Style Fidelity
   ------------------ | ------ | --------- | ------- | --------------
-  Conditioned I-JEPA | 0.6318 | 16.86     | 184.87   | 34.39%
-  Vanilla I-JEPA     | 0.6301 | 16.75     | 185.80   | 35.40%
-  Classical Inpaint  | 0.7090 | 19.59     | 149.86   | 36.64%
+  Conditioned I-JEPA | 0.6058 | 21.08     | 105.71   | 80.27%
+  Vanilla I-JEPA     | 0.6030 | 20.99     | 106.89   | 79.03%
+  Classical Inpaint  | 0.7090 | 19.59     | 149.86   | 63.02%
 
 2. Conditioning Ablation Study (Macro Metrics):
 ------------------------------------------------------------
   Conditioning Slice | SSIM   | PSNR (dB) | Style Fidelity
   ------------------ | ------ | --------- | --------------
-  No Conditioning    | 0.6301 | 16.75     | 35.40%
-  Color-Only         | 0.6319 | 16.85     | 33.93%
-  Texture-Only       | 0.6310 | 16.83     | 35.06%
-  Full Hybrid Vector | 0.6318 | 16.86     | 34.39%
+  No Conditioning    | 0.6030 | 20.99     | 79.03%
+  Color-Only         | 0.6070 | 21.08     | 79.82%
+  Texture-Only       | 0.6037 | 21.00     | 79.59%
+  Full Hybrid Vector | 0.6058 | 21.08     | 80.27%
 
 3. Key Scientific Implications:
 ------------------------------------------------------------
@@ -30,7 +30,7 @@ Masking Ratio: Fixed 50% (exactly 98 target patches)
   - [Style Fidelity Leap]: The classical method maintains generic pixel coherence
     but achieves negligible Style Fidelity under classification. Style-Conditioned
     I-JEPA successfully preserves artistic style characteristics, achieving a massive
-    34.4% classification matching accuracy.
+    80.3% classification matching accuracy.
   - [Ablation Insight]: Combining both handcrafted texture (GLCM, LBP) and color histograms
     with deep DINOv2 CNN features provides the predictor with a comprehensive style
     conditioning representation, outperforming either color or texture alone.

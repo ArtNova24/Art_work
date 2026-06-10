@@ -75,27 +75,26 @@ class TransformerBlock(nn.Module):
         return x
 
 
-# -- Vision Transformer Context / Target Encoder
+# -- Vision Transformer Context / Target Encoder (Pretrained ViT MAE)
 class ViTContextEncoder(nn.Module):
-    def __init__(self, img_size=224, patch_size=16, in_chans=3, embed_dim=256, depth=6, heads=8, mlp_ratio=4.0, dropout=0.1):
+    def __init__(self, img_size=224, patch_size=16, in_chans=3, embed_dim=768, depth=6, heads=8, mlp_ratio=4.0, dropout=0.1, pretrained=True):
         super().__init__()
         self.img_size = img_size
         self.patch_size = patch_size
         self.embed_dim = embed_dim
+        self.num_patches = (img_size // patch_size) ** 2  # 196
         
-        # Patch projection
-        self.patch_embed = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
-        self.num_patches = (img_size // patch_size) ** 2
-        
-        # Positional Embeddings
-        self.pos_embed = nn.Parameter(torch.zeros(1, self.num_patches, embed_dim))
-        nn.init.trunc_normal_(self.pos_embed, std=0.02)
-        
-        # Transformer blocks
-        self.blocks = nn.ModuleList([
-            TransformerBlock(dim=embed_dim, heads=heads, mlp_ratio=mlp_ratio, dropout=dropout)
-            for _ in range(depth)
-        ])
+        import timm
+        # Load pretrained ViT-B/16 (MAE pretrained)
+        self.vit = timm.create_model(
+            'vit_base_patch16_224.mae',   # MAE pretrained weights
+            pretrained=pretrained,
+            num_classes=0,                # Remove classification head
+            global_pool='',               # Return all patch tokens
+        )
+
+        # Projection head to match downstream embed_dim if needed
+        self.proj = nn.Linear(768, embed_dim) if embed_dim != 768 else nn.Identity()
         self.norm = nn.LayerNorm(embed_dim)
 
     def forward(self, x, mask=None, get_all=False):
@@ -105,54 +104,109 @@ class ViTContextEncoder(nn.Module):
         get_all: if True, skips masking and processes the entire image (used by target encoder).
         """
         B = x.shape[0]
-        # Patch projection
-        patches = self.patch_embed(x)  # (B, embed_dim, 14, 14)
-        patches = patches.flatten(2).transpose(1, 2)  # (B, 196, embed_dim)
-        
-        # Add position embeddings
-        patches = patches + self.pos_embed
-        
+
+        # Extract all patch tokens from pretrained ViT
+        # Returns (B, 197, 768) — 196 patches + 1 CLS token
+        features = self.vit.forward_features(x)
+        patches = features[:, 1:, :]  # Remove CLS → (B, 196, 768)
+        patches = self.proj(patches)  # → (B, 196, embed_dim)
+        patches = self.norm(patches)
+
         if get_all or mask is None:
-            # Process entire sequence
-            for block in self.blocks:
-                patches = block(patches)
-            return self.norm(patches)
-        
-        # Masked selection: Gather context patches (False in mask)
-        # Sort mask: False (0) elements sort before True (1) elements
+            return patches
+
+        # Apply masking: keep only context (unmasked) patches (False in mask)
         sorted_indices = torch.argsort(mask.to(torch.int32), dim=1)
-        num_ctx = self.num_patches - mask.sum(dim=1)[0].item() # 196 - 98 = 98
-        
+        num_ctx = self.num_patches - int(mask.sum(dim=1)[0].item())
         context_indices = sorted_indices[:, :num_ctx]
-        
-        # Gather patches
-        ctx_patches = torch.gather(patches, 1, context_indices.unsqueeze(-1).expand(-1, -1, self.embed_dim))
-        
-        # Process context sequence
-        for block in self.blocks:
-            ctx_patches = block(ctx_patches)
-            
-        return self.norm(ctx_patches), context_indices
+
+        ctx_patches = torch.gather(
+            patches, 1,
+            context_indices.unsqueeze(-1).expand(-1, -1, self.embed_dim)
+        )
+        return ctx_patches, context_indices
 
 
-# -- Style-Conditioned Predictor (Transformer Decoder)
-class StyleConditionedPredictor(nn.Module):
-    def __init__(self, embed_dim=256, depth=4, heads=8, mlp_ratio=4.0, dropout=0.1):
+# -- FiLM Conditioning Layer
+class FiLMLayer(nn.Module):
+    """
+    Feature-wise Linear Modulation.
+    Given a style vector s of shape (B, style_dim),
+    learns per-feature scale and shift for a feature of shape (B, N, feat_dim).
+    """
+    def __init__(self, style_dim, feat_dim):
         super().__init__()
-        self.embed_dim = embed_dim
+        self.gamma_net = nn.Linear(style_dim, feat_dim)
+        self.beta_net  = nn.Linear(style_dim, feat_dim)
+        # Initialize to identity (no modulation at start)
+        nn.init.zeros_(self.gamma_net.weight)
+        nn.init.ones_(self.gamma_net.bias)
+        nn.init.zeros_(self.beta_net.weight)
+        nn.init.zeros_(self.beta_net.bias)
+
+    def forward(self, x, style):
+        """
+        x     : (B, N, feat_dim)
+        style : (B, style_dim)
+        """
+        gamma = self.gamma_net(style).unsqueeze(1)  # (B, 1, feat_dim)
+        beta  = self.beta_net(style).unsqueeze(1)   # (B, 1, feat_dim)
+        return gamma * x + beta                     # Broadcast over N
+
+
+# -- Transformer Block with FiLM
+class FiLMTransformerBlock(nn.Module):
+    def __init__(self, dim, heads=8, mlp_ratio=4.0, dropout=0.1, style_dim=256):
+        super().__init__()
+        self.norm1 = nn.LayerNorm(dim)
+        self.attn  = Attention(dim, heads=heads, dropout=dropout)
+        self.norm2 = nn.LayerNorm(dim)
+        self.mlp   = nn.Sequential(
+            nn.Linear(dim, int(dim * mlp_ratio)),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(int(dim * mlp_ratio), dim),
+            nn.Dropout(dropout)
+        )
+        # FiLM layer applied AFTER each sub-layer
+        self.film1 = FiLMLayer(style_dim, dim)
+        self.film2 = FiLMLayer(style_dim, dim)
+
+    def forward(self, x, style=None):
+        # Self-attention with FiLM modulation
+        attn_out = self.attn(self.norm1(x))
+        if style is not None:
+            attn_out = self.film1(attn_out, style)
+        x = x + attn_out
+
+        # MLP with FiLM modulation
+        mlp_out = self.mlp(self.norm2(x))
+        if style is not None:
+            mlp_out = self.film2(mlp_out, style)
+        x = x + mlp_out
+        return x
+
+
+# -- Style-Conditioned Predictor (Transformer Decoder with FiLM)
+class StyleConditionedPredictor(nn.Module):
+    def __init__(self, embed_dim=768, depth=4, heads=8, mlp_ratio=4.0, dropout=0.1, style_dim=256):
+        super().__init__()
+        self.embed_dim   = embed_dim
         self.num_patches = 196
-        
-        # Learnable masked-patch token
+
         self.mask_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         nn.init.trunc_normal_(self.mask_token, std=0.02)
-        
-        # Target Positional Embeddings
+
         self.pos_embed = nn.Parameter(torch.zeros(1, self.num_patches, embed_dim))
         nn.init.trunc_normal_(self.pos_embed, std=0.02)
-        
-        # Transformer Blocks
+
+        # Use FiLM-conditioned transformer blocks instead of plain blocks
         self.blocks = nn.ModuleList([
-            TransformerBlock(dim=embed_dim, heads=heads, mlp_ratio=mlp_ratio, dropout=dropout)
+            FiLMTransformerBlock(
+                dim=embed_dim, heads=heads,
+                mlp_ratio=mlp_ratio, dropout=dropout,
+                style_dim=style_dim
+            )
             for _ in range(depth)
         ])
         self.norm = nn.LayerNorm(embed_dim)
@@ -160,62 +214,88 @@ class StyleConditionedPredictor(nn.Module):
     def forward(self, z_ctx, s_emb, mask):
         """
         z_ctx: (B, N_ctx, embed_dim) Context latents from encoder.
-        s_emb: (B, embed_dim) Projected style embedding vector.
+        s_emb: (B, style_dim) Projected style embedding vector.
         mask: (B, 196) Boolean mask grid.
         """
         B = z_ctx.shape[0]
-        
-        # Determine target (masked) indices (True in mask)
+
         sorted_indices = torch.argsort(mask.to(torch.int32), dim=1)
-        num_ctx = self.num_patches - mask.sum(dim=1)[0].item()
-        
-        target_indices = sorted_indices[:, num_ctx:] # Select target indices
-        
-        # Gather target positional encodings
-        target_pos = torch.gather(self.pos_embed.expand(B, -1, -1), 1, target_indices.unsqueeze(-1).expand(-1, -1, self.embed_dim))
-        
-        # Initialize target patches as Mask Token + Target Positional Encoding
-        target_tokens = self.mask_token.expand(B, target_indices.shape[1], -1) + target_pos
-        
-        # Prepare style token (B, 1, embed_dim)
-        style_token = s_emb.unsqueeze(1)
-        
-        # Concatenate: [Style Token; Context Latents; Target Tokens]
-        # Shape: (B, 1 + N_ctx + N_tgt, embed_dim) -> (B, 1 + 98 + 98, 256) -> (B, 197, 256)
-        x = torch.cat([style_token, z_ctx, target_tokens], dim=1)
-        
-        # Process predictor sequence
+        num_ctx = self.num_patches - int(mask.sum(dim=1)[0].item())
+        target_indices = sorted_indices[:, num_ctx:]
+
+        target_pos = torch.gather(
+            self.pos_embed.expand(B, -1, -1), 1,
+            target_indices.unsqueeze(-1).expand(-1, -1, self.embed_dim)
+        )
+        target_tokens = self.mask_token.expand(
+            B, target_indices.shape[1], -1
+        ) + target_pos
+
+        # Concatenate context + target (NO style prepend token anymore)
+        x = torch.cat([z_ctx, target_tokens], dim=1)
+
+        # Pass style through FiLM at EVERY layer — cannot be ignored
         for block in self.blocks:
-            x = block(x)
-            
+            x = block(x, style=s_emb)   # <-- style conditions every block
+
         x = self.norm(x)
-        
-        # Extract target predictions (the last N_tgt tokens in the sequence)
         z_tgt_pred = x[:, -target_indices.shape[1]:]
-        
         return z_tgt_pred, target_indices
 
 
-# -- Lightweight Pixel Decoder
+# -- Convolutional Pixel Decoder
 class PixelDecoder(nn.Module):
-    def __init__(self, embed_dim=256, patch_size=16, channels=3):
+    """
+    Convolutional pixel decoder.
+    Input : (B, N_tgt, embed_dim) latent predictions
+    Output: (B, N_tgt, 3, 16, 16) pixel patches in [-1, 1]
+    """
+    def __init__(self, embed_dim=768, patch_size=16, channels=3):
         super().__init__()
         self.patch_size = patch_size
-        self.channels = channels
-        
-        self.net = nn.Sequential(
-            nn.Linear(embed_dim, 512),
+        self.channels   = channels
+        self.embed_dim  = embed_dim
+
+        # Project latent to spatial feature map seed
+        self.fc = nn.Linear(embed_dim, 512 * 2 * 2)  # 512 channels, 2x2 spatial
+
+        # Convolutional upsampling: 2x2 → 4x4 → 8x8 → 16x16
+        self.conv_decoder = nn.Sequential(
+            # 2x2 → 4x4
+            nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2),
+            nn.BatchNorm2d(256),
             nn.GELU(),
-            nn.Linear(512, channels * patch_size * patch_size),
-            nn.Tanh()  # Outputs pixels in range [-1, 1]
+            # 4x4 → 8x8
+            nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2),
+            nn.BatchNorm2d(128),
+            nn.GELU(),
+            # 8x8 → 16x16
+            nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2),
+            nn.BatchNorm2d(64),
+            nn.GELU(),
+            # Final: map to RGB channels
+            nn.Conv2d(64, channels, kernel_size=3, padding=1),
+            nn.Tanh()
         )
 
     def forward(self, z_tgt_pred):
         """
         z_tgt_pred: (B, N_tgt, embed_dim)
-        Returns: Reconstructed target patches of shape (B, N_tgt, 3, 16, 16)
+        Returns   : (B, N_tgt, 3, 16, 16)
         """
         B, N_tgt, _ = z_tgt_pred.shape
-        pixels = self.net(z_tgt_pred)  # (B, N_tgt, 3 * 16 * 16)
-        pixels = pixels.reshape(B, N_tgt, self.channels, self.patch_size, self.patch_size)
-        return pixels
+
+        # Flatten patches into batch dimension for conv processing
+        z_flat = z_tgt_pred.reshape(B * N_tgt, self.embed_dim)
+
+        # Linear projection to spatial seed
+        x = self.fc(z_flat)                          # (B*N_tgt, 512*4)
+        x = x.reshape(B * N_tgt, 512, 2, 2)          # (B*N_tgt, 512, 2, 2)
+
+        # Convolutional upsampling to 16x16
+        x = self.conv_decoder(x)                     # (B*N_tgt, 3, 16, 16)
+
+        # Reshape back to patch sequence
+        x = x.reshape(B, N_tgt, self.channels,
+                       self.patch_size, self.patch_size)
+        return x

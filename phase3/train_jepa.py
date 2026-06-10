@@ -15,6 +15,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
+import torchvision.models as tv_models
 from torchvision.utils import save_image
 
 # Central configs
@@ -22,13 +23,73 @@ from phase3.config import (
     DEVICE, BATCH_SIZE, EPOCHS, LR, WEIGHT_DECAY,
     EMA_MOMENTUM_BASE, EMA_MOMENTUM_MAX, LATENT_LOSS_WEIGHT, PIXEL_LOSS_WEIGHT,
     PROJECTOR_PATH, ENCODER_PATH, PREDICTOR_PATH, DECODER_PATH, TARGET_ENCODER_PATH,
-    RECON_DIR
+    RECON_DIR, VIT_EMBED_DIM
 )
 from phase3.masking import BlockMaskGenerator
 from phase3.models import (
     StyleProjector, ViTContextEncoder, StyleConditionedPredictor, PixelDecoder
 )
 from phase3.dataset import StyleJEPAImageDataset
+
+# -- Perceptual Loss Module
+class PerceptualStyleLoss(nn.Module):
+    """
+    Computes VGG-based perceptual loss + Gram matrix style loss.
+    Uses VGG-16 features from multiple layers.
+    """
+    def __init__(self, device):
+        super().__init__()
+        vgg = tv_models.vgg16(weights=tv_models.VGG16_Weights.DEFAULT).features
+        # Layers: relu1_2, relu2_2, relu3_3, relu4_3
+        self.slice1 = nn.Sequential(*list(vgg)[:4]).to(device).eval()
+        self.slice2 = nn.Sequential(*list(vgg)[4:9]).to(device).eval()
+        self.slice3 = nn.Sequential(*list(vgg)[9:16]).to(device).eval()
+        self.slice4 = nn.Sequential(*list(vgg)[16:23]).to(device).eval()
+
+        for param in self.parameters():
+            param.requires_grad = False  # Frozen VGG
+
+        # ImageNet normalization for VGG input
+        self.register_buffer('mean', torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(device))
+        self.register_buffer('std',  torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(device))
+
+    def normalize_for_vgg(self, x):
+        # x is in [-1, 1], convert to [0, 1] then ImageNet normalize
+        x = (x + 1.0) / 2.0
+        return (x - self.mean) / self.std
+
+    def gram_matrix(self, feat):
+        B, C, H, W = feat.shape
+        feat_flat = feat.reshape(B, C, H * W)
+        gram = torch.bmm(feat_flat, feat_flat.transpose(1, 2))
+        return gram / (C * H * W)
+
+    def forward(self, pred, target):
+        """
+        pred, target: (B, 3, H, W) in [-1, 1]
+        Returns: perceptual_loss, style_loss (both scalars)
+        """
+        pred_n   = self.normalize_for_vgg(pred)
+        target_n = self.normalize_for_vgg(target)
+
+        # Extract VGG features
+        p1 = self.slice1(pred_n);  t1 = self.slice1(target_n)
+        p2 = self.slice2(p1);      t2 = self.slice2(t1)
+        p3 = self.slice3(p2);      t3 = self.slice3(t2)
+        p4 = self.slice4(p3);      t4 = self.slice4(t3)
+
+        # Perceptual loss: feature L2 distance
+        perc_loss = (F.mse_loss(p1, t1) + F.mse_loss(p2, t2) +
+                     F.mse_loss(p3, t3) + F.mse_loss(p4, t4))
+
+        # Style loss: Gram matrix distance
+        style_loss = (F.mse_loss(self.gram_matrix(p1), self.gram_matrix(t1)) +
+                      F.mse_loss(self.gram_matrix(p2), self.gram_matrix(t2)) +
+                      F.mse_loss(self.gram_matrix(p3), self.gram_matrix(t3)) +
+                      F.mse_loss(self.gram_matrix(p4), self.gram_matrix(t4)))
+
+        return perc_loss, style_loss
+
 
 def extract_patches(img_tensor, patch_size=16):
     """
@@ -100,15 +161,22 @@ def run_training(dry_run=False, num_epochs=None):
         
     print(f"    Models loaded on device: {DEVICE}", flush=True)
 
+    # Initialize perceptual style loss helper
+    perceptual_loss_fn = PerceptualStyleLoss(device=DEVICE)
+
     # 3. Optimizer & Schedulers
-    optimizer = torch.optim.AdamW(
-        list(projector.parameters()) + 
-        list(context_encoder.parameters()) + 
-        list(predictor.parameters()) + 
-        list(pixel_decoder.parameters()),
-        lr=LR,
-        weight_decay=WEIGHT_DECAY
-    )
+    # Differential learning rates for pretrained vs new components
+    vit_params = list(context_encoder.vit.parameters())
+    vit_param_ids = set(map(id, vit_params))
+    other_enc_params = [p for p in context_encoder.parameters() if id(p) not in vit_param_ids]
+    
+    optimizer = torch.optim.AdamW([
+        {'params': vit_params, 'lr': LR * 0.1},
+        {'params': other_enc_params, 'lr': LR},
+        {'params': projector.parameters(), 'lr': LR},
+        {'params': predictor.parameters(), 'lr': LR},
+        {'params': pixel_decoder.parameters(), 'lr': LR},
+    ], lr=LR, weight_decay=WEIGHT_DECAY)
     
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs_to_run)
     mask_gen = BlockMaskGenerator(grid_size=14, target_masked=98)
@@ -148,21 +216,21 @@ def run_training(dry_run=False, num_epochs=None):
             
             # --- 1. Forward pass Target Encoder (Stop-Grad EMA)
             with torch.no_grad():
-                z_target_all = target_encoder(imgs, get_all=True) # (B, 196, 256)
+                z_target_all = target_encoder(imgs, get_all=True) # (B, 196, VIT_EMBED_DIM)
                 # Gather ground-truth target patch representations
                 z_target_gt = torch.gather(
                     z_target_all, 1, 
-                    target_indices.unsqueeze(-1).expand(-1, -1, 256)
-                ) # (B, 98, 256)
+                    target_indices.unsqueeze(-1).expand(-1, -1, VIT_EMBED_DIM)
+                ) # (B, 98, VIT_EMBED_DIM)
             
             # --- 2. Forward pass Style Projector
-            s_emb = projector(style_vecs) # (B, 256)
+            s_emb = projector(style_vecs) # (B, STYLE_EMBED_DIM)
             
             # --- 3. Forward pass Context Encoder (Only unmasked patches)
-            z_ctx, _ = context_encoder(imgs, mask=masks) # (B, 98, 256)
+            z_ctx, _ = context_encoder(imgs, mask=masks) # (B, 98, VIT_EMBED_DIM)
             
             # --- 4. Forward pass Predictor (Predict Target latents conditioned on style)
-            z_tgt_pred, _ = predictor(z_ctx, s_emb, mask=masks) # (B, 98, 256)
+            z_tgt_pred, _ = predictor(z_ctx, s_emb, mask=masks) # (B, 98, VIT_EMBED_DIM)
             
             # --- 5. Forward pass Pixel Decoder
             pixel_pred = pixel_decoder(z_tgt_pred) # (B, 98, 3, 16, 16)
@@ -173,10 +241,17 @@ def run_training(dry_run=False, num_epochs=None):
                 target_indices.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, 3, 16, 16)
             ) # (B, 98, 3, 16, 16)
             
+            # Reconstruct predicted image for perceptual/style loss
+            recon_patches = img_patches.clone()
+            recon_patches[torch.arange(B).unsqueeze(-1), target_indices] = pixel_pred
+            pred_img = reconstruct_image(recon_patches)  # (B, 3, 224, 224)
+            
             # --- 6. Loss calculation
             latent_loss = F.mse_loss(z_tgt_pred, z_target_gt.detach())
-            pixel_loss = F.mse_loss(pixel_pred, pixel_gt)
+            mse_loss = F.mse_loss(pixel_pred, pixel_gt)
+            perc_loss, style_gram_loss = perceptual_loss_fn(pred_img, imgs)
             
+            pixel_loss = 0.5 * mse_loss + 0.3 * perc_loss + 0.2 * style_gram_loss
             loss = LATENT_LOSS_WEIGHT * latent_loss + PIXEL_LOSS_WEIGHT * pixel_loss
             
             # --- 7. Backprop & step
@@ -236,7 +311,7 @@ def run_training(dry_run=False, num_epochs=None):
                 
                 # Forward
                 val_z_tgt_all = target_encoder(val_imgs, get_all=True)
-                val_z_tgt_gt = torch.gather(val_z_tgt_all, 1, val_target_idx.unsqueeze(-1).expand(-1, -1, 256))
+                val_z_tgt_gt = torch.gather(val_z_tgt_all, 1, val_target_idx.unsqueeze(-1).expand(-1, -1, VIT_EMBED_DIM))
                 
                 val_s_emb = projector(val_style_vecs)
                 val_z_ctx, _ = context_encoder(val_imgs, mask=val_masks)
@@ -248,9 +323,16 @@ def run_training(dry_run=False, num_epochs=None):
                     val_target_idx.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, 3, 16, 16)
                 )
                 
+                # Reconstruct validation prediction for compound loss
+                val_recon_patches = val_img_patches.clone()
+                val_recon_patches[torch.arange(B_val).unsqueeze(-1), val_target_idx] = val_pixel_pred
+                val_pred_img = reconstruct_image(val_recon_patches)
+                
                 # Losses
                 val_latent_l = F.mse_loss(val_z_tgt_pred, val_z_tgt_gt)
-                val_pixel_l = F.mse_loss(val_pixel_pred, val_pixel_gt)
+                val_mse_l = F.mse_loss(val_pixel_pred, val_pixel_gt)
+                val_perc_l, val_style_l = perceptual_loss_fn(val_pred_img, val_imgs)
+                val_pixel_l = 0.5 * val_mse_l + 0.3 * val_perc_l + 0.2 * val_style_l
                 val_loss = LATENT_LOSS_WEIGHT * val_latent_l + PIXEL_LOSS_WEIGHT * val_pixel_l
                 
                 val_loss_sum += val_loss.item() * B_val

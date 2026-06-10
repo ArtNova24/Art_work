@@ -347,6 +347,8 @@ def extract_pil_image(value):
             print(f"Error opening image filepath {value}: {e}")
             return None
     if isinstance(value, dict):
+        if "path" in value:
+            return extract_pil_image(value["path"])
         img = value.get("background")
         if img is None:
             img = value.get("composite")
@@ -366,118 +368,72 @@ def run_inference(mode, img_mode1, editor_clean, editor_corrupted, show_metrics)
     """
     Gradio callback supporting 5 modes.
     """
-    layers = []
-    # 1. Extract base image and drawing layers
-    if mode == "Mode 1: Auto-Generated 50% Mask (Validation)":
-        pil_image = extract_pil_image(img_mode1)
-    elif mode == "Mode 2: Interactive Eraser (Draw Mask on Clean Image)":
-        if isinstance(editor_clean, dict):
-            pil_image = extract_pil_image(editor_clean.get("background"))
-            layers = editor_clean.get("layers", [])
-        else:
-            pil_image = extract_pil_image(editor_clean)
-    elif mode == "Mode 3: Interactive Paint Corruption (Draw Corruption directly)":
-        if isinstance(editor_clean, dict):
-            pil_image = extract_pil_image(editor_clean.get("composite"))
-            layers = editor_clean.get("layers", [])
-        else:
-            pil_image = extract_pil_image(editor_clean)
-    elif mode == "Mode 4: Auto-Detect on Corrupted Image (In-the-Wild)":
-        if isinstance(editor_corrupted, dict):
-            pil_image = extract_pil_image(editor_corrupted.get("background"))
-            if pil_image is None:
-                pil_image = extract_pil_image(editor_corrupted.get("composite"))
-        else:
-            pil_image = extract_pil_image(editor_corrupted)
-    else:  # Mode 5: Manual Mask on Corrupted Image (Precision)
-        if isinstance(editor_corrupted, dict):
-            pil_image = extract_pil_image(editor_corrupted.get("background"))
-            if pil_image is None:
-                pil_image = extract_pil_image(editor_corrupted.get("composite"))
-            layers = editor_corrupted.get("layers", [])
-        else:
-            pil_image = extract_pil_image(editor_corrupted)
+    print(f"\n[run_inference] Mode: {mode}")
+    try:
+        layers = []
+        # 1. Extract base image and drawing layers
+        if mode == "Mode 1: Auto-Generated 50% Mask (Validation)":
+            pil_image = extract_pil_image(img_mode1)
+        elif mode == "Mode 2: Interactive Eraser (Draw Mask on Clean Image)":
+            if isinstance(editor_clean, dict):
+                pil_image = extract_pil_image(editor_clean.get("background"))
+                layers = editor_clean.get("layers", [])
+            else:
+                pil_image = extract_pil_image(editor_clean)
+        elif mode == "Mode 3: Interactive Paint Corruption (Draw Corruption directly)":
+            if isinstance(editor_clean, dict):
+                pil_image = extract_pil_image(editor_clean.get("composite"))
+                layers = editor_clean.get("layers", [])
+            else:
+                pil_image = extract_pil_image(editor_clean)
+        elif mode == "Mode 4: Auto-Detect on Corrupted Image (In-the-Wild)":
+            if isinstance(editor_corrupted, dict):
+                pil_image = extract_pil_image(editor_corrupted.get("background"))
+                if pil_image is None:
+                    pil_image = extract_pil_image(editor_corrupted.get("composite"))
+            else:
+                pil_image = extract_pil_image(editor_corrupted)
+        else:  # Mode 5: Manual Mask on Corrupted Image (Precision)
+            if isinstance(editor_corrupted, dict):
+                pil_image = extract_pil_image(editor_corrupted.get("background"))
+                if pil_image is None:
+                    pil_image = extract_pil_image(editor_corrupted.get("composite"))
+                layers = editor_corrupted.get("layers", [])
+            else:
+                pil_image = extract_pil_image(editor_corrupted)
 
-    if pil_image is None:
-        return [None] * 5 + [None, "**Please upload or select an image first.**"]
+        if pil_image is None:
+            print("  [run_inference] Error: pil_image is None.")
+            return [None] * 5 + [None, "**Please upload or select an image first.**"]
 
-    # Normalize base image
-    pil_image = pil_image.convert("RGB").resize((IMG_SIZE, IMG_SIZE))
-    img_tensor = pil_to_tensor(pil_image)   # (1, 3, 224, 224) [-1, 1]
+        # Normalize base image
+        pil_image = pil_image.convert("RGB").resize((IMG_SIZE, IMG_SIZE))
+        img_tensor = pil_to_tensor(pil_image)   # (1, 3, 224, 224) [-1, 1]
 
-    # Initialize mask and corrupted preview
-    mask_1d = torch.zeros(196, dtype=torch.bool)
-    corrupted_pil = None
+        # Initialize mask and corrupted preview
+        mask_1d = torch.zeros(196, dtype=torch.bool)
+        corrupted_pil = None
 
-    # Determine original/input image to display
-    if mode == "Mode 3: Interactive Paint Corruption (Draw Corruption directly)":
-        if isinstance(editor_clean, dict):
-            out_orig_pil = extract_pil_image(editor_clean.get("background"))
-            if out_orig_pil is not None:
-                out_orig_pil = out_orig_pil.convert("RGB").resize((IMG_SIZE, IMG_SIZE))
+        # Determine original/input image to display
+        if mode == "Mode 3: Interactive Paint Corruption (Draw Corruption directly)":
+            if isinstance(editor_clean, dict):
+                out_orig_pil = extract_pil_image(editor_clean.get("background"))
+                if out_orig_pil is not None:
+                    out_orig_pil = out_orig_pil.convert("RGB").resize((IMG_SIZE, IMG_SIZE))
+                else:
+                    out_orig_pil = pil_image
             else:
                 out_orig_pil = pil_image
         else:
             out_orig_pil = pil_image
-    else:
-        out_orig_pil = pil_image
 
-    # 2. Generate mask and corrupted preview based on mode
-    if mode == "Mode 1: Auto-Generated 50% Mask (Validation)":
-        np.random.seed(RANDOM_SEED)
-        torch.manual_seed(RANDOM_SEED)
-        mask_1d = _mask_gen.generate_mask()
-        
-        # Build corrupted image for display
-        patches = extract_patches(img_tensor.to(DEVICE))
-        sorted_idx = torch.argsort(mask_1d.unsqueeze(0).to(torch.int32).to(DEVICE), dim=1)
-        num_tgt = int(mask_1d.sum().item())
-        tgt_idx = sorted_idx[:, -num_tgt:] if num_tgt > 0 else sorted_idx[:, :0]
-        
-        corr_patches = patches.clone()
-        if num_tgt > 0:
-            corr_patches[0, tgt_idx[0]] = -0.8
-        corrupted_tensor = reconstruct_image(corr_patches)[0].cpu()
-        corrupted_pil = tensor_to_pil(corrupted_tensor)
-
-    elif mode in [
-        "Mode 2: Interactive Eraser (Draw Mask on Clean Image)",
-        "Mode 3: Interactive Paint Corruption (Draw Corruption directly)",
-        "Mode 5: Manual Mask on Corrupted Image (Precision)"
-    ]:
-        custom_mask_2d = None
-        if layers:
-            combined_alpha = None
-            for layer in layers:
-                layer_rgba = layer.convert("RGBA")
-                np_layer = np.array(layer_rgba)
-                alpha = np_layer[:, :, 3]
-                if combined_alpha is None:
-                    combined_alpha = (alpha > 10).astype(np.uint8) * 255
-                else:
-                    combined_alpha = np.maximum(combined_alpha, (alpha > 10).astype(np.uint8) * 255)
-            if combined_alpha is not None and np.any(combined_alpha > 0):
-                custom_mask_2d = combined_alpha
-
-        if custom_mask_2d is not None:
-            mask_pil = Image.fromarray(custom_mask_2d).resize((IMG_SIZE, IMG_SIZE), Image.Resampling.NEAREST)
-            np_mask_224 = np.array(mask_pil)
+        # 2. Generate mask and corrupted preview based on mode
+        if mode == "Mode 1: Auto-Generated 50% Mask (Validation)":
+            np.random.seed(RANDOM_SEED)
+            torch.manual_seed(RANDOM_SEED)
+            mask_1d = _mask_gen.generate_mask()
             
-            for i in range(14):
-                for j in range(14):
-                    patch_pixels = np_mask_224[i*16:(i+1)*16, j*16:(j+1)*16]
-                    if np.sum(patch_pixels > 128) > 12: # if ~5% of pixels are drawn on
-                        mask_1d[i*14 + j] = True
-        
-        if not torch.any(mask_1d):
-            if mode == "Mode 5: Manual Mask on Corrupted Image (Precision)":
-                mask_1d = detect_corrupted_patches(img_tensor)
-            else:
-                np.random.seed(RANDOM_SEED)
-                torch.manual_seed(RANDOM_SEED)
-                mask_1d = _mask_gen.generate_mask()
-        
-        if mode == "Mode 2: Interactive Eraser (Draw Mask on Clean Image)":
+            # Build corrupted image for display
             patches = extract_patches(img_tensor.to(DEVICE))
             sorted_idx = torch.argsort(mask_1d.unsqueeze(0).to(torch.int32).to(DEVICE), dim=1)
             num_tgt = int(mask_1d.sum().item())
@@ -488,77 +444,159 @@ def run_inference(mode, img_mode1, editor_clean, editor_corrupted, show_metrics)
                 corr_patches[0, tgt_idx[0]] = -0.8
             corrupted_tensor = reconstruct_image(corr_patches)[0].cpu()
             corrupted_pil = tensor_to_pil(corrupted_tensor)
-        else:
+
+        elif mode in [
+            "Mode 2: Interactive Eraser (Draw Mask on Clean Image)",
+            "Mode 3: Interactive Paint Corruption (Draw Corruption directly)",
+            "Mode 5: Manual Mask on Corrupted Image (Precision)"
+        ]:
+            custom_mask_2d = None
+            
+            # Method 1: Compare composite vs background (highly robust for brush/paint/erasures)
+            editor_dict = editor_clean if mode in ["Mode 2: Interactive Eraser (Draw Mask on Clean Image)", "Mode 3: Interactive Paint Corruption (Draw Corruption directly)"] else editor_corrupted
+            if isinstance(editor_dict, dict):
+                bg = extract_pil_image(editor_dict.get("background"))
+                comp = extract_pil_image(editor_dict.get("composite"))
+                if bg is not None and comp is not None:
+                    bg_rgb = bg.convert("RGB").resize((IMG_SIZE, IMG_SIZE))
+                    comp_rgb = comp.convert("RGB").resize((IMG_SIZE, IMG_SIZE))
+                    bg_np = np.array(bg_rgb).astype(np.float32)
+                    comp_np = np.array(comp_rgb).astype(np.float32)
+                    diff_max = np.max(np.abs(comp_np - bg_np), axis=2)
+                    # Use a small threshold of 8 to capture color changes while ignoring minor compression noise
+                    diff_mask = (diff_max > 8).astype(np.uint8) * 255
+                    if np.any(diff_mask > 0):
+                        custom_mask_2d = diff_mask
+                        print(f"  [run_inference] Detected mask via composite difference: {np.sum(diff_mask > 0)} pixels.")
+
+            # Method 2: Fallback to layers alpha channels
+            if custom_mask_2d is None and layers:
+                combined_alpha = None
+                for layer in layers:
+                    if layer is not None:
+                        try:
+                            layer_pil = extract_pil_image(layer)
+                            if layer_pil is not None:
+                                layer_rgba = layer_pil.convert("RGBA")
+                                np_layer = np.array(layer_rgba)
+                                alpha = np_layer[:, :, 3]
+                                if combined_alpha is None:
+                                    combined_alpha = (alpha > 10).astype(np.uint8) * 255
+                                else:
+                                    combined_alpha = np.maximum(combined_alpha, (alpha > 10).astype(np.uint8) * 255)
+                        except Exception as e:
+                            print(f"  [run_inference] Error parsing layer: {e}")
+                if combined_alpha is not None and np.any(combined_alpha > 0):
+                    custom_mask_2d = combined_alpha
+                    print(f"  [run_inference] Detected mask via layers alpha: {np.sum(combined_alpha > 0)} pixels.")
+
+            if custom_mask_2d is not None:
+                mask_pil = Image.fromarray(custom_mask_2d).resize((IMG_SIZE, IMG_SIZE), Image.Resampling.NEAREST)
+                np_mask_224 = np.array(mask_pil)
+                if len(np_mask_224.shape) == 3:
+                    np_mask_224 = np_mask_224[:, :, 0]
+                
+                for i in range(14):
+                    for j in range(14):
+                        patch_pixels = np_mask_224[i*16:(i+1)*16, j*16:(j+1)*16]
+                        # Sensitive threshold of 2 pixels (about 1% of a 16x16 patch) to catch thin brush strokes
+                        if np.sum(patch_pixels > 128) > 2:
+                            mask_1d[i*14 + j] = True
+                print(f"  [run_inference] Custom mask registered: {int(mask_1d.sum().item())} patches.")
+            
+            if not torch.any(mask_1d):
+                if mode == "Mode 5: Manual Mask on Corrupted Image (Precision)":
+                    print("  [run_inference] No custom mask detected, falling back to auto-detect.")
+                    mask_1d = detect_corrupted_patches(img_tensor)
+                else:
+                    print("  [run_inference] No custom mask detected, falling back to random 50% mask.")
+                    np.random.seed(RANDOM_SEED)
+                    torch.manual_seed(RANDOM_SEED)
+                    mask_1d = _mask_gen.generate_mask()
+            
+            if mode == "Mode 2: Interactive Eraser (Draw Mask on Clean Image)":
+                patches = extract_patches(img_tensor.to(DEVICE))
+                sorted_idx = torch.argsort(mask_1d.unsqueeze(0).to(torch.int32).to(DEVICE), dim=1)
+                num_tgt = int(mask_1d.sum().item())
+                tgt_idx = sorted_idx[:, -num_tgt:] if num_tgt > 0 else sorted_idx[:, :0]
+                
+                corr_patches = patches.clone()
+                if num_tgt > 0:
+                    corr_patches[0, tgt_idx[0]] = -0.8
+                corrupted_tensor = reconstruct_image(corr_patches)[0].cpu()
+                corrupted_pil = tensor_to_pil(corrupted_tensor)
+            else:
+                corrupted_pil = overlay_mask(pil_image, mask_1d)
+
+        else:  # Mode 4: Auto-Detect on Corrupted Image (In-the-Wild)
+            mask_1d = detect_corrupted_patches(img_tensor)
             corrupted_pil = overlay_mask(pil_image, mask_1d)
+            print(f"  [run_inference] Auto-detected mask: {int(mask_1d.sum().item())} patches.")
 
-    else:  # Mode 4: Auto-Detect on Corrupted Image (In-the-Wild)
-        mask_1d = detect_corrupted_patches(img_tensor)
-        corrupted_pil = overlay_mask(pil_image, mask_1d)
+        # 3. Extract style features (with de-poisoning for Modes 3, 4, 5)
+        if mode in [
+            "Mode 3: Interactive Paint Corruption (Draw Corruption directly)",
+            "Mode 4: Auto-Detect on Corrupted Image (In-the-Wild)",
+            "Mode 5: Manual Mask on Corrupted Image (Precision)"
+        ]:
+            style_inpainted_pil = _opencv_inpaint(img_tensor, mask_1d)
+            style_inpainted_tensor = pil_to_tensor(style_inpainted_pil)
+            with torch.no_grad():
+                style_vec = extract_hybrid(style_inpainted_tensor[0])
+        else:
+            with torch.no_grad():
+                style_vec = extract_hybrid(img_tensor[0])  # (989,)
 
-    # 3. Extract style features (with de-poisoning for Modes 3, 4, 5)
-    if mode in [
-        "Mode 3: Interactive Paint Corruption (Draw Corruption directly)",
-        "Mode 4: Auto-Detect on Corrupted Image (In-the-Wild)",
-        "Mode 5: Manual Mask on Corrupted Image (Precision)"
-    ]:
-        style_inpainted_pil = _opencv_inpaint(img_tensor, mask_1d)
-        style_inpainted_tensor = pil_to_tensor(style_inpainted_pil)
-        with torch.no_grad():
-            style_vec = extract_hybrid(style_inpainted_tensor[0])
-    else:
-        with torch.no_grad():
-            style_vec = extract_hybrid(img_tensor[0])  # (989,)
+        # 4. Classify style
+        try:
+            probs = _classifier.predict_proba(style_vec.reshape(1, -1))[0]
+        except Exception:
+            probs = np.ones(len(ALL_CLASSES)) / len(ALL_CLASSES)
+        pred_idx = int(np.argmax(probs))
 
-    # 4. Classify style
-    try:
-        probs = _classifier.predict_proba(style_vec.reshape(1, -1))[0]
-    except Exception:
-        probs = np.ones(len(ALL_CLASSES)) / len(ALL_CLASSES)
-    pred_idx = int(np.argmax(probs))
+        chart = _style_chart(probs, pred_idx, title="Input Artwork -- Style Classification")
 
-    chart = _style_chart(probs, pred_idx, title="Input Artwork -- Style Classification")
+        # 5. Run reconstructions
+        cond_t = _reconstruct(img_tensor, style_vec, mask_1d, ablation=None)
+        vanilla_t = _reconstruct(img_tensor, style_vec, mask_1d, ablation='zeros')
+        opencv_pil = _opencv_inpaint(img_tensor, mask_1d)
 
-    # 5. Run reconstructions
-    cond_t = _reconstruct(img_tensor, style_vec, mask_1d, ablation=None)
-    vanilla_t = _reconstruct(img_tensor, style_vec, mask_1d, ablation='zeros')
-    opencv_pil = _opencv_inpaint(img_tensor, mask_1d)
+        cond_pil = tensor_to_pil(cond_t)
+        vanilla_pil = tensor_to_pil(vanilla_t)
 
-    cond_pil = tensor_to_pil(cond_t)
-    vanilla_pil = tensor_to_pil(vanilla_t)
+        # 6. Compute metrics
+        metrics_md = ""
+        if show_metrics:
+            clean_ref_pil = None
+            if mode == "Mode 1: Auto-Generated 50% Mask (Validation)":
+                clean_ref_pil = pil_image
+            elif mode == "Mode 2: Interactive Eraser (Draw Mask on Clean Image)":
+                clean_ref_pil = pil_image
+            elif mode == "Mode 3: Interactive Paint Corruption (Draw Corruption directly)":
+                if isinstance(editor_clean, dict):
+                    clean_ref_pil = extract_pil_image(editor_clean.get("background"))
 
-    # 6. Compute metrics
-    metrics_md = ""
-    if show_metrics:
-        clean_ref_pil = None
-        if mode == "Mode 1: Auto-Generated 50% Mask (Validation)":
-            clean_ref_pil = pil_image
-        elif mode == "Mode 2: Interactive Eraser (Draw Mask on Clean Image)":
-            clean_ref_pil = pil_image
-        elif mode == "Mode 3: Interactive Paint Corruption (Draw Corruption directly)":
-            if isinstance(editor_clean, dict):
-                clean_ref_pil = extract_pil_image(editor_clean.get("background"))
+            if clean_ref_pil is not None:
+                clean_ref_pil = clean_ref_pil.convert("RGB").resize((IMG_SIZE, IMG_SIZE))
+                clean_ref_tensor = pil_to_tensor(clean_ref_pil)
+                orig_np = tensor_to_np(clean_ref_tensor[0])
+                cond_np = tensor_to_np(cond_t)
+                vanilla_np = tensor_to_np(vanilla_t)
+                opencv_np = np.array(opencv_pil).astype(np.float32) / 255.0
 
-        if clean_ref_pil is not None:
-            clean_ref_pil = clean_ref_pil.convert("RGB").resize((IMG_SIZE, IMG_SIZE))
-            clean_ref_tensor = pil_to_tensor(clean_ref_pil)
-            orig_np = tensor_to_np(clean_ref_tensor[0])
-            cond_np = tensor_to_np(cond_t)
-            vanilla_np = tensor_to_np(vanilla_t)
-            opencv_np = np.array(opencv_pil).astype(np.float32) / 255.0
+                ssim_c, psnr_c = _compute_metrics(orig_np, cond_np)
+                ssim_v, psnr_v = _compute_metrics(orig_np, vanilla_np)
+                ssim_o, psnr_o = _compute_metrics(orig_np, opencv_np)
 
-            ssim_c, psnr_c = _compute_metrics(orig_np, cond_np)
-            ssim_v, psnr_v = _compute_metrics(orig_np, vanilla_np)
-            ssim_o, psnr_o = _compute_metrics(orig_np, opencv_np)
+                try:
+                    recon_feat = extract_hybrid(cond_t)
+                    recon_pred = int(_classifier.predict(recon_feat.reshape(1, -1))[0])
+                    fidelity_str = ("✅ Style Preserved" if recon_pred == pred_idx
+                                    else f"⚠ Reconstructed as: {ALL_CLASSES[recon_pred].replace('_',' ').title()}")
+                except Exception:
+                    fidelity_str = "N/A"
 
-            try:
-                recon_feat = extract_hybrid(cond_t)
-                recon_pred = int(_classifier.predict(recon_feat.reshape(1, -1))[0])
-                fidelity_str = ("✅ Style Preserved" if recon_pred == pred_idx
-                                else f"⚠ Reconstructed as: {ALL_CLASSES[recon_pred].replace('_',' ').title()}")
-            except Exception:
-                fidelity_str = "N/A"
-
-            metrics_md = f"""
+                metrics_md = f"""
 ### 📊 Reconstruction Metrics
 
 | Method | SSIM ↑ | PSNR (dB) ↑ |
@@ -571,19 +609,19 @@ def run_inference(mode, img_mode1, editor_clean, editor_corrupted, show_metrics)
 **Detected Style:** {ALL_CLASSES[pred_idx].replace('_', ' ').title()}
 
 **Conditioned Reconstruction:** {fidelity_str}
-            """
-        else:
-            try:
-                recon_feat = extract_hybrid(cond_t)
-                recon_pred = int(_classifier.predict(recon_feat.reshape(1, -1))[0])
-                fidelity_str = f"🎨 Reconstructed Style: **{ALL_CLASSES[recon_pred].replace('_',' ').title()}**"
-            except Exception:
-                fidelity_str = "N/A"
+                """
+            else:
+                try:
+                    recon_feat = extract_hybrid(cond_t)
+                    recon_pred = int(_classifier.predict(recon_feat.reshape(1, -1))[0])
+                    fidelity_str = f"🎨 Reconstructed Style: **{ALL_CLASSES[recon_pred].replace('_',' ').title()}**"
+                except Exception:
+                    fidelity_str = "N/A"
 
-            num_detected = int(mask_1d.sum().item())
-            pct_detected = round((num_detected / 196) * 100, 1)
+                num_detected = int(mask_1d.sum().item())
+                pct_detected = round((num_detected / 196) * 100, 1)
 
-            metrics_md = f"""
+                metrics_md = f"""
 ### 📊 Reconstruction Status
 *Metrics (SSIM/PSNR) are not available because no ground-truth clean image was provided.*
 
@@ -593,17 +631,36 @@ def run_inference(mode, img_mode1, editor_clean, editor_corrupted, show_metrics)
 
 > [!NOTE]
 > In this in-the-wild mode, the model auto-detected or manually masked the damaged regions shown in red on the **Corrupted / Mask Visualized** panel and predicted their contents using I-JEPA conditioned on the art style detected from the remaining parts of the image.
-            """
+                """
 
-    return (
-        out_orig_pil,
-        corrupted_pil,
-        cond_pil,
-        vanilla_pil,
-        opencv_pil,
-        chart,
-        metrics_md
-    )
+        return (
+            out_orig_pil,
+            corrupted_pil,
+            cond_pil,
+            vanilla_pil,
+            opencv_pil,
+            chart,
+            metrics_md
+        )
+    except Exception as e:
+        import traceback
+        print(f"  [run_inference] ERROR: Exception occurred during inference:")
+        traceback.print_exc()
+        error_msg = f"""
+### ❌ Exception During Reconstruction
+An error occurred during inference in the Python backend.
+
+**Error Details:**
+```text
+{str(e)}
+```
+
+**Traceback:**
+```text
+{traceback.format_exc()}
+```
+"""
+        return [None] * 5 + [None, error_msg]
 
 # ---------------------------------------------------------------------------
 # Gradio UI construction
